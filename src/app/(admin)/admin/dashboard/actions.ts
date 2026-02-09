@@ -75,6 +75,7 @@ export async function getArchivedUsers(filters: { role: string; year: string; sc
 }
 
 // ユーザー管理: アーカイブ（論理削除）
+// ユーザー管理: アーカイブ（論理削除/物理削除）
 export async function archiveUser(userId: string) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
@@ -87,23 +88,59 @@ export async function archiveUser(userId: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) return { error: "User not found" };
 
-        const now = new Date();
-        const currentYear = now.getFullYear();
+        if (user.role === "INSTRUCTOR") {
+            // Hard Delete for Instructor
+            await prisma.$transaction(async (tx) => {
+                // 1. Delete ArchiveAccess
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (tx as any).archiveAccess.deleteMany({ where: { instructorId: userId } });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                archivedAt: now,
-                archiveYear: currentYear,
-                isActive: false // Also deactivate
-            } as any
-        });
+                // 2. Delete ScheduleRequests
+                await tx.scheduleRequest.deleteMany({ where: { instructorId: userId } });
 
-        revalidatePath("/admin/dashboard");
-        return { success: true };
+                // 3. Delete Shifts and related Bookings/Reports
+                const shifts = await tx.shift.findMany({ where: { instructorId: userId }, select: { id: true } });
+                const shiftIds = shifts.map(s => s.id);
+
+                if (shiftIds.length > 0) {
+                    // Find bookings to delete reports
+                    const bookings = await tx.booking.findMany({ where: { shiftId: { in: shiftIds } }, select: { id: true } });
+                    const bookingIds = bookings.map(b => b.id);
+
+                    if (bookingIds.length > 0) {
+                        await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                        await tx.booking.deleteMany({ where: { shiftId: { in: shiftIds } } });
+                    }
+                    await tx.shift.deleteMany({ where: { instructorId: userId } });
+                }
+
+                // 4. Delete the User
+                await tx.user.delete({ where: { id: userId } });
+            });
+
+            revalidatePath("/admin/dashboard");
+            return { success: true, message: "講師データを完全に削除しました" };
+        } else {
+            // Soft Delete for Student (Archive)
+            const now = new Date();
+            const currentYear = now.getFullYear();
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    archivedAt: now,
+                    archiveYear: currentYear,
+                    isActive: false // Also deactivate
+                } as any
+            });
+
+            revalidatePath("/admin/dashboard");
+            return { success: true, message: "ユーザーをアーカイブしました" };
+        }
     } catch (e) {
-        return { error: "Failed to archive user" };
+        console.error(e);
+        return { error: "Failed to archive/delete user" };
     }
 }
 

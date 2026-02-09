@@ -334,13 +334,17 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                         variant="destructive"
                                                         size="sm"
                                                         onClick={async () => {
-                                                            if (!confirm("本当にアーカイブしますか？\nログインできなくなりますが、データは残ります。")) return;
+                                                            const message = user.role === "INSTRUCTOR"
+                                                                ? "本当に削除しますか？\n講師データ・シフト・授業記録など全て完全に削除され、復元できません。"
+                                                                : "本当にアーカイブしますか？\nログインできなくなりますが、データは残ります。";
+
+                                                            if (!confirm(message)) return;
                                                             const res = await archiveUser(user.id);
-                                                            if (res.success) alert("アーカイブしました");
+                                                            if (res.success) alert(res.message || "処理が完了しました");
                                                             else alert(res.error);
                                                         }}
                                                     >
-                                                        アーカイブ
+                                                        {user.role === "INSTRUCTOR" ? "削除" : "アーカイブ"}
                                                     </Button>
                                                 </td>
                                             </tr>
