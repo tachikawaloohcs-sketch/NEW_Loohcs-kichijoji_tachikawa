@@ -7,8 +7,10 @@ export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
     try {
-        const instructors = await getInstructors();
-        const bookings = await getStudentBookings();
+        const [instructors, bookings] = await Promise.all([
+            getInstructors(),
+            getStudentBookings()
+        ]);
 
         return (
             <div className="p-8 space-y-8 max-w-6xl mx-auto">
