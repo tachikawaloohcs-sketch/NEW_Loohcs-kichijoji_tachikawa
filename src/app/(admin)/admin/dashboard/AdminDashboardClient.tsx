@@ -73,6 +73,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers } from "./actions";
+import { logout } from "@/lib/actions";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
 
 export default function AdminDashboardClient({ students, allUsers, allInstructors, masterShifts, initialDeadlineExtension = 0 }: { students: Student[], allUsers: User[], allInstructors: Instructor[], masterShifts: Shift[], initialDeadlineExtension?: number }) {
@@ -169,6 +170,11 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                 <div>
                     <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
                     <p className="text-muted-foreground">生徒のカルテ管理</p>
+                </div>
+                <div className="flex gap-2">
+                    <form action={logout}>
+                        <Button variant="outline">ログアウト</Button>
+                    </form>
                 </div>
             </header>
 
