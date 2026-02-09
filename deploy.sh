@@ -46,7 +46,9 @@ gcloud run deploy reservation-service \
   --project "$PROJECT_ID" \
   --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
   --set-env-vars "DATABASE_URL=postgresql://postgres:$DB_PASSWORD@localhost/reservation-db?host=/cloudsql/$INSTANCE_CONNECTION_NAME" \
-  --set-env-vars "AUTH_SECRET=$AUTH_SECRET"
+  --set-env-vars "AUTH_SECRET=$AUTH_SECRET" \
+  --memory 1Gi \
+  --timeout 600
 
 echo ""
 echo "Done!"

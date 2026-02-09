@@ -14,16 +14,22 @@ export async function GET(request: Request) {
     }
 
     try {
-        console.log("Starting manual migration via API...");
-        // Use the global prisma command as we set it up in Dockerfile
-        const { stdout, stderr } = await execAsync('prisma db push --accept-data-loss --schema=./prisma/schema.prisma');
-        console.log("Migration STDOUT:", stdout);
-        console.log("Migration STDERR:", stderr);
+        console.log("Starting manual migration via API (Async Mode)...");
+
+        // Execute in background without awaiting
+        execAsync('prisma db push --accept-data-loss --schema=./prisma/schema.prisma')
+            .then(({ stdout, stderr }) => {
+                console.log("Async Migration Success:");
+                console.log("STDOUT:", stdout);
+                if (stderr) console.log("STDERR:", stderr);
+            })
+            .catch((error) => {
+                console.error("Async Migration Failed:", error);
+            });
 
         return NextResponse.json({
             success: true,
-            stdout,
-            stderr
+            message: "Migration started in background. Please check server logs in Google Cloud Console in 30-60 seconds."
         });
     } catch (error) {
         console.error("Migration failed:", error);
