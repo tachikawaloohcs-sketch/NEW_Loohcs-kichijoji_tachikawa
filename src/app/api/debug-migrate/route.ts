@@ -47,6 +47,41 @@ export async function GET(request: Request) {
             logs.push(`Set NOT NULL failed: ${e}`);
         }
 
+        // ==========================================
+        // NEW: Fix other potentially missing columns
+        // ==========================================
+
+        // ScheduleRequest.location
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "ScheduleRequest" ADD COLUMN IF NOT EXISTS "location" TEXT NOT NULL DEFAULT 'ONLINE';`);
+            logs.push("Fixed: ScheduleRequest.location");
+        } catch (e) { logs.push(`ScheduleRequest.location fix error: ${e}`); }
+
+        // ScheduleRequest.type
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "ScheduleRequest" ADD COLUMN IF NOT EXISTS "type" TEXT NOT NULL DEFAULT 'INDIVIDUAL';`);
+            logs.push("Fixed: ScheduleRequest.type");
+        } catch (e) { logs.push(`ScheduleRequest.type fix error: ${e}`); }
+
+        // ScheduleRequest.status
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "ScheduleRequest" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'PENDING';`);
+            logs.push("Fixed: ScheduleRequest.status");
+        } catch (e) { logs.push(`ScheduleRequest.status fix error: ${e}`); }
+
+        // Booking.meetingType
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Booking" ADD COLUMN IF NOT EXISTS "meetingType" TEXT NOT NULL DEFAULT 'ONLINE';`);
+            logs.push("Fixed: Booking.meetingType");
+        } catch (e) { logs.push(`Booking.meetingType fix error: ${e}`); }
+
+        // Shift.location
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Shift" ADD COLUMN IF NOT EXISTS "location" TEXT NOT NULL DEFAULT 'ONLINE';`);
+            logs.push("Fixed: Shift.location");
+        } catch (e) { logs.push(`Shift.location fix error: ${e}`); }
+
+
         // 5. Add Foreign Key (Optional but good)
         try {
             // Check if constraint exists first to avoid error? roughly
