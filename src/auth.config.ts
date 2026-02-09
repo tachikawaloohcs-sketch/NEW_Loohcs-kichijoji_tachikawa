@@ -23,45 +23,24 @@ export const authConfig: NextAuthConfig = {
         },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
+            const isOnDashboard = nextUrl.pathname.includes("/dashboard");
             const role = auth?.user?.role;
-            const isOnDashboard = nextUrl.pathname.includes("/dashboard"); // Keep existing check or broaden it?
 
-            // Broaden protection to any role-specific path
-            const isOnStudentArea = nextUrl.pathname.startsWith("/student");
-            const isOnInstructorArea = nextUrl.pathname.startsWith("/instructor");
-            const isOnAdminArea = nextUrl.pathname.startsWith("/admin");
-
-            // Dashboard paths map
-            const dashboardPaths: Record<string, string> = {
-                STUDENT: "/student/dashboard",
-                INSTRUCTOR: "/instructor/dashboard",
-                ADMIN: "/admin/dashboard",
-            };
-
-            if (isOnStudentArea || isOnInstructorArea || isOnAdminArea) {
+            // Dashboard logic
+            if (isOnDashboard) {
                 if (isLoggedIn) {
-                    const userDashboard = dashboardPaths[role as string] || "/";
-
-                    if (isOnStudentArea && role !== "STUDENT") {
-                        return Response.redirect(new URL(userDashboard, nextUrl));
-                    }
-                    if (isOnInstructorArea && role !== "INSTRUCTOR") {
-                        return Response.redirect(new URL(userDashboard, nextUrl));
-                    }
-                    if (isOnAdminArea && role !== "ADMIN") {
-                        return Response.redirect(new URL(userDashboard, nextUrl));
-                    }
+                    // Role Check
+                    if (nextUrl.pathname.startsWith("/student") && role !== "STUDENT") return false;
+                    if (nextUrl.pathname.startsWith("/instructor") && role !== "INSTRUCTOR") return false;
+                    if (nextUrl.pathname.startsWith("/admin") && role !== "ADMIN") return false;
                     return true;
                 }
                 return false; // Redirect unauthenticated users to login page
             } else if (isLoggedIn) {
                 // Redirect logged-in users away from auth pages
-                const isOnAuthPage = nextUrl.pathname === "/login" || nextUrl.pathname === "/register" || nextUrl.pathname === "/";
+                const isOnAuthPage = nextUrl.pathname === "/login" || nextUrl.pathname === "/register";
                 if (isOnAuthPage) {
-                    const userDashboard = dashboardPaths[role as string];
-                    if (userDashboard && nextUrl.pathname !== userDashboard) {
-                        return Response.redirect(new URL(userDashboard, nextUrl));
-                    }
+                    return Response.redirect(new URL("/", nextUrl));
                 }
             }
             return true;

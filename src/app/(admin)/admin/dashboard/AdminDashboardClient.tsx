@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, startTransition } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { format, isSameDay } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
 import { ja } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,7 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
+    createdAt: Date | string;
 }
 
 interface User {
@@ -33,12 +33,6 @@ interface User {
     admissionResults?: any[];
     archiveYear?: number | null;
     archivedAt?: Date | null;
-    stats?: {
-        monthPublished: number;
-        monthCompleted: number;
-        yearCompleted: number;
-        totalCompleted: number;
-    };
 }
 
 interface Instructor {
@@ -59,15 +53,7 @@ interface Student {
     id: string;
     name: string | null;
     email: string;
-    studentBookings: {
-        id: string;
-        status: string;
-        shift: {
-            start: Date;
-            instructor: { name: string | null };
-        };
-        report: Report | null;
-    }[];
+    studentBookings: Booking[];
 }
 
 interface Shift {
@@ -86,47 +72,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers } from "./actions";
-import { logout } from "@/lib/actions";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
 
 export default function AdminDashboardClient({ students, allUsers, allInstructors, masterShifts, initialDeadlineExtension = 0 }: { students: Student[], allUsers: User[], allInstructors: Instructor[], masterShifts: Shift[], initialDeadlineExtension?: number }) {
-    const [optimisticShifts, setOptimisticShifts] = useState(masterShifts);
-
-    // Sync with server data when it returns
-    useEffect(() => {
-        setOptimisticShifts(masterShifts);
-    }, [masterShifts]);
-
     const [activeTab, setActiveTab] = useState("reports");
-    const [calendarDate, setCalendarDate] = useState<Date | undefined>(undefined);
+    const [calendarDate, setCalendarDate] = useState<Date | undefined>(new Date());
+
     // Settings State
     const [deadlineExtension, setDeadlineExtension] = useState(initialDeadlineExtension.toString());
 
     // Lesson Management State
     const [shiftInstructorId, setShiftInstructorId] = useState("");
-    const [shiftDate, setShiftDate] = useState<Date | undefined>(undefined);
+    const [shiftDate, setShiftDate] = useState<Date | undefined>(new Date());
     const [shiftTime, setShiftTime] = useState("10:00");
-    const [shiftEndTime, setShiftEndTime] = useState("11:00");
-    const [shiftType, setShiftType] = useState("INDIVIDUAL");
-
-    useEffect(() => {
-        setCalendarDate(new Date());
-        setShiftDate(new Date());
-    }, []);
-
-    useEffect(() => {
-        if (!shiftTime) return;
-        const [h, m] = shiftTime.split(':').map(Number);
-        if (isNaN(h) || isNaN(m)) return;
-        const d = new Date();
-        d.setHours(h, m, 0, 0);
-
-        let duration = 1;
-        if (shiftType === 'GROUP' || shiftType === 'SPECIAL') duration = 2;
-
-        d.setHours(d.getHours() + duration);
-        setShiftEndTime(format(d, "HH:mm"));
-    }, [shiftTime, shiftType]);
 
     const [bookingShiftId, setBookingShiftId] = useState("");
     const [bookingStudentId, setBookingStudentId] = useState("");
@@ -136,7 +94,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
     const [filterLocation, setFilterLocation] = useState("ALL");
     const [filterType, setFilterType] = useState("ALL");
 
-    const filteredShifts = optimisticShifts.filter(shift => {
+    const filteredShifts = masterShifts.filter(shift => {
         if (filterInstructor !== "ALL" && shift.instructor.name !== filterInstructor) return false;
         if (filterLocation !== "ALL" && shift.location !== filterLocation) return false;
         if (filterType !== "ALL" && shift.type !== filterType) return false;
@@ -148,18 +106,9 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
     const handleCreateShift = async () => {
         if (!shiftInstructorId) return alert("講師を選択してください");
         if (!shiftDate) return alert("日付を選択してください");
-        // Ensure shiftDate is valid
-        if (isNaN(shiftDate.getTime())) return alert("無効な日付です");
-
-        // Pass date as string "YYYY-MM-DD"
-        const dateStr = format(shiftDate, "yyyy-MM-dd");
-        const res = await adminCreateShift(shiftInstructorId, dateStr, shiftTime, shiftEndTime, shiftType);
-        if (res.success) {
-            alert("シフトを作成しました");
-            // Optional: reset form or just keep it
-        } else {
-            alert(res.error);
-        }
+        const res = await adminCreateShift(shiftInstructorId, shiftDate, shiftTime);
+        if (res.success) alert("シフトを作成しました");
+        else alert(res.error);
     };
 
     const handleCreateBooking = async () => {
@@ -211,7 +160,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
         setIsAccessDialogOpen(true);
     };
 
-    const formatDate = (d: Date) => formatInTimeZone(d, "Asia/Tokyo", "yyyy/MM/dd HH:mm", { locale: ja });
+    const formatDate = (d: Date) => format(d, "yyyy/MM/dd HH:mm");
 
     return (
         <div className="container mx-auto p-6 space-y-8">
@@ -220,7 +169,6 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                     <h1 className="text-3xl font-bold">管理者ダッシュボード</h1>
                     <p className="text-muted-foreground">生徒のカルテ管理</p>
                 </div>
-                <Button variant="outline" onClick={() => logout()}>ログアウト</Button>
             </header>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -286,7 +234,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                             <SelectItem value="GROUP">集団</SelectItem>
                                             <SelectItem value="BEGINNER">ビギナー</SelectItem>
                                             <SelectItem value="TRIAL">無料体験</SelectItem>
-                                            <SelectItem value="SPECIAL">特別パック</SelectItem>
+                                            <SelectItem value="SPECIAL">特別</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -303,7 +251,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                 </div>
                                 <div className="flex-1 space-y-4">
                                     <h3 className="font-semibold text-lg border-b pb-2">
-                                        {calendarDate ? formatInTimeZone(calendarDate, "Asia/Tokyo", "yyyy年M月d日", { locale: ja }) : "日付を選択"} のシフト
+                                        {calendarDate ? format(calendarDate, "yyyy年M月d日", { locale: ja }) : "日付を選択"} のシフト
                                     </h3>
                                     <div className="space-y-2">
                                         {calendarDate && filteredShifts.filter(s => isSameDay(s.start, calendarDate)).length === 0 ? (
@@ -323,20 +271,9 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                                 className="h-6 text-[10px] px-2"
                                                                 onClick={async () => {
                                                                     if (!confirm("本当にこのシフトを削除しますか？\n（予約がある場合、予約も削除されます）")) return;
-
-                                                                    // Optimistic update: remove immediately
-                                                                    setOptimisticShifts(prev => prev.filter(s => s.id !== shift.id));
-
-                                                                    startTransition(async () => {
-                                                                        const res = await adminDeleteShift(shift.id);
-                                                                        if (res.success) {
-                                                                            // Success: wait for revalidatePath from server to update props
-                                                                        } else {
-                                                                            alert(res.error);
-                                                                            // Revert on error
-                                                                            setOptimisticShifts(masterShifts);
-                                                                        }
-                                                                    });
+                                                                    const res = await adminDeleteShift(shift.id);
+                                                                    if (res.success) alert("削除しました");
+                                                                    else alert(res.error);
                                                                 }}
                                                             >
                                                                 削除
@@ -344,19 +281,15 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2 mb-1">
-                                                        <span>{formatInTimeZone(shift.start, "Asia/Tokyo", "HH:mm", { locale: ja })} - {formatInTimeZone(shift.end, "Asia/Tokyo", "HH:mm", { locale: ja })}</span>
+                                                        <span>{format(shift.start, "HH:mm")} - {format(shift.end, "HH:mm")}</span>
                                                         <Badge variant={shift.type === "INDIVIDUAL" ? "default" : shift.type === "GROUP" ? "secondary" : shift.type === "BEGINNER" ? "outline" : shift.type === "TRIAL" ? "default" : "destructive"} className="text-[10px]">
-                                                            {shift.type === "INDIVIDUAL" ? "個別" : shift.type === "GROUP" ? "集団" : shift.type === "BEGINNER" ? "ビギナー" : shift.type === "TRIAL" ? "無料体験" : "特別パック"}
+                                                            {shift.type === "INDIVIDUAL" ? "個別" : shift.type === "GROUP" ? "集団" : shift.type === "BEGINNER" ? "ビギナー" : shift.type === "TRIAL" ? "無料体験" : "特別"}
                                                         </Badge>
                                                     </div>
                                                     {shift.className && <div className="text-xs text-muted-foreground mb-1">{shift.className}</div>}
                                                     <div className="text-xs">
                                                         {shift.bookings.length > 0 ? (
-                                                            shift.type === 'GROUP' ? (
-                                                                <span className="text-blue-600 font-semibold">予約: {shift.bookings.length}名</span>
-                                                            ) : (
-                                                                <span className="text-green-600 font-semibold">予約: {shift.bookings[0].student.name}</span>
-                                                            )
+                                                            <span className="text-green-600 font-semibold">予約: {shift.bookings[0].student.name}</span>
                                                         ) : (
                                                             <span className="text-muted-foreground">予約なし</span>
                                                         )}
@@ -385,7 +318,6 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                             <th className="p-4 text-left font-medium">名前</th>
                                             <th className="p-4 text-left font-medium">メールアドレス</th>
                                             <th className="p-4 text-left font-medium">権限</th>
-                                            <th className="p-4 text-left font-medium">実績 (今月/年/計)</th>
                                             <th className="p-4 text-left font-medium">操作</th>
                                         </tr>
                                     </thead>
@@ -396,16 +328,6 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                 <td className="p-4">{user.name}</td>
                                                 <td className="p-4">{user.email}</td>
                                                 <td className="p-4">{user.role}</td>
-                                                <td className="p-4">
-                                                    {user.role === 'INSTRUCTOR' && user.stats ? (
-                                                        <div className="text-xs space-y-1">
-                                                            <div><span className="font-semibold text-blue-600">公開:</span> {user.stats.monthPublished}</div>
-                                                            <div><span className="font-semibold text-green-600">完了:</span> {user.stats.monthCompleted} / {user.stats.yearCompleted} / {user.stats.totalCompleted}</div>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-muted-foreground">-</span>
-                                                    )}
-                                                </td>
                                                 <td className="p-4">
                                                     <Button
                                                         variant="destructive"
@@ -585,36 +507,11 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                 </div>
                                 <div className="space-y-2">
                                     <Label>日付</Label>
-                                    <Input
-                                        type="date"
-                                        value={shiftDate ? format(shiftDate, "yyyy-MM-dd") : ""}
-                                        onChange={(e) => setShiftDate(e.target.value ? new Date(e.target.value) : undefined)}
-                                    />
+                                    <Input type="date" onChange={(e) => setShiftDate(new Date(e.target.value))} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>開始時間</Label>
                                     <Input type="time" value={shiftTime} onChange={(e) => setShiftTime(e.target.value)} />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>終了時間</Label>
-                                    <Input type="time" value={shiftEndTime} onChange={(e) => setShiftEndTime(e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>授業種別</Label>
-                                    <Select value={shiftType} onValueChange={setShiftType}>
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="INDIVIDUAL">個別</SelectItem>
-                                            <SelectItem value="GROUP">集団</SelectItem>
-                                            <SelectItem value="BEGINNER">ビギナー</SelectItem>
-                                            <SelectItem value="TRIAL">無料体験</SelectItem>
-                                            <SelectItem value="SPECIAL">特別パック</SelectItem>
-                                        </SelectContent>
-                                    </Select>
                                 </div>
                             </div>
                             <Button onClick={handleCreateShift}>シフト作成（強制）</Button>
@@ -634,17 +531,8 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                     <p className="text-xs text-muted-foreground">※ シフトIDはDB等から確認してください（簡易実装）</p>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>生徒</Label>
-                                    <Select value={bookingStudentId} onValueChange={setBookingStudentId}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="生徒を選択" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {allUsers.filter(u => u.role === "STUDENT").map(u => (
-                                                <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <Label>生徒ID</Label>
+                                    <Input placeholder="Student ID" value={bookingStudentId} onChange={(e) => setBookingStudentId(e.target.value)} />
                                 </div>
                             </div>
                             <Button onClick={handleCreateBooking}>予約作成（強制）</Button>

@@ -30,7 +30,6 @@ interface Shift {
     type: string;
     className?: string | null;
     location?: string;
-    bookings: { id: string }[];
 }
 
 interface Booking {
@@ -53,12 +52,7 @@ interface Booking {
 
 export default function StudentDashboardClient({ instructors, initialBookings }: { instructors: User[], initialBookings: Booking[] }) {
     const [selectedInstructor, setSelectedInstructor] = useState<User | null>(null);
-    const [date, setDate] = useState<Date | undefined>(undefined);
-
-    // Fix Hydration Error
-    useEffect(() => {
-        setDate(new Date());
-    }, []);
+    const [date, setDate] = useState<Date | undefined>(new Date());
     const [shifts, setShifts] = useState<Shift[]>([]);
     const [loadingShifts, setLoadingShifts] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -70,10 +64,36 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
     // Request Dialog
     const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
     const [requestInstructorId, setRequestInstructorId] = useState<string>("");
-    const [requestDate, setRequestDate] = useState<Date | undefined>(undefined);
-    useEffect(() => { setRequestDate(new Date()); }, []);
+    const [requestDate, setRequestDate] = useState<Date | undefined>(new Date());
     const [requestTime, setRequestTime] = useState("10:00");
     const [isRequesting, setIsRequesting] = useState(false);
+
+    const [requestLocation, setRequestLocation] = useState<string>("ONLINE");
+    const [requestType, setRequestType] = useState<string>("INDIVIDUAL");
+    const [requestEndTime, setRequestEndTime] = useState("11:00");
+
+    // Auto-calculate end time based on type and start time
+    // Special: 2 hours (default, editable)
+    // Group: 2 hours (fixed)
+    // Individual: 1 hour (default)
+    useEffect(() => {
+        if (!requestTime) return;
+        const [h, m] = requestTime.split(':').map(Number);
+
+        let duration = 1;
+        if (requestType === 'SPECIAL' || requestType === 'GROUP') {
+            duration = 2;
+        }
+
+        let endH = h + duration;
+        let endM = m;
+
+        // Simple overflow handling (24h)
+        if (endH >= 24) endH -= 24;
+
+        const newEndTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+        setRequestEndTime(newEndTime);
+    }, [requestTime, requestType]);
 
     const handleCreateRequest = async () => {
         if (!requestInstructorId || !requestDate || !requestTime) {
@@ -82,7 +102,7 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
         }
 
         setIsRequesting(true);
-        const res = await createRequest(requestInstructorId, requestDate, requestTime);
+        const res = await createRequest(requestInstructorId, requestDate, requestTime, requestEndTime, requestLocation, requestType);
         setIsRequesting(false);
 
         if (res.success) {
@@ -113,7 +133,6 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
 
     const openBookingDialog = (shift: Shift) => {
         setSelectedShiftForBooking(shift);
-        // Default meeting type based on location
         if (shift.location === 'ONLINE') {
             setMeetingType("ONLINE");
         } else {
@@ -143,8 +162,8 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
         switch (loc) {
             case 'KICHIJOJI': return '吉祥寺校舎';
             case 'TACHIKAWA': return '立川校舎';
-            case 'ONLINE': return 'オンライン';
-            default: return 'オンライン';
+            case 'ONLINE': return 'オンライン（推奨）';
+            default: return 'オンライン（推奨）';
         }
     };
 
@@ -199,16 +218,11 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                                                 <div className="flex flex-col">
                                                     <div className="flex items-center gap-2">
                                                         <Badge variant={shift.type === 'INDIVIDUAL' ? 'default' : 'secondary'}>
-                                                            {shift.type === 'INDIVIDUAL' ? '個別' : shift.type === 'GROUP' ? '集団' : '特別パック'}
+                                                            {shift.type === 'INDIVIDUAL' ? '個別' : shift.type === 'GROUP' ? '集団' : '特別'}
                                                         </Badge>
                                                         <span className="font-bold text-lg">
                                                             {formatTime(shift.start)} - {formatTime(shift.end)}
                                                         </span>
-                                                        {shift.type === 'GROUP' && (
-                                                            <span className="text-sm text-blue-600 font-semibold ml-2">
-                                                                (予約: {shift.bookings.length}名)
-                                                            </span>
-                                                        )}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground mt-1">
                                                         場所: {getLocationLabel(shift.location)}
@@ -377,14 +391,47 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                         </div>
                         <div className="space-y-2">
                             <Label>開始時間</Label>
-                            <Select onValueChange={setRequestTime} value={requestTime}>
+                            <Input
+                                type="time"
+                                value={requestTime}
+                                onChange={(e) => setRequestTime(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>終了時間</Label>
+                            <Input
+                                type="time"
+                                value={requestEndTime}
+                                onChange={(e) => setRequestEndTime(e.target.value)}
+                                disabled={requestType === 'GROUP'}
+                                className={requestType === 'GROUP' ? "bg-slate-100" : ""}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>授業場所</Label>
+                            <Select onValueChange={setRequestLocation} value={requestLocation}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="時間を選択" />
+                                    <SelectValue placeholder="場所を選択" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {Array.from({ length: 17 }, (_, i) => i + 6).map(hour => (
-                                        <SelectItem key={hour} value={`${hour}:00`}>{`${hour}:00`}</SelectItem>
-                                    ))}
+                                    <SelectItem value="ONLINE">オンライン（推奨）</SelectItem>
+                                    <SelectItem value="TACHIKAWA">立川校舎</SelectItem>
+                                    <SelectItem value="KICHIJOJI">吉祥寺校舎</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>授業種別</Label>
+                            <Select onValueChange={setRequestType} value={requestType}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="種別を選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="INDIVIDUAL">個別指導</SelectItem>
+                                    <SelectItem value="GROUP">集団授業</SelectItem>
+                                    <SelectItem value="SPECIAL">特別授業</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -396,6 +443,6 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </Tabs >
+        </Tabs>
     );
 }

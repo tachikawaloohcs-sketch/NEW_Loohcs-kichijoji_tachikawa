@@ -3,13 +3,11 @@
 
 generator client {
   provider = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -120,6 +118,8 @@ model ScheduleRequest {
   instructor   User     @relation("InstructorRequests", fields: [instructorId], references: [id])
   start        DateTime
   end          DateTime
+  location     String   @default("ONLINE")
+  type         String   @default("INDIVIDUAL") // "INDIVIDUAL", "GROUP"
   status       String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
   message      String?
   createdAt    DateTime @default(now())

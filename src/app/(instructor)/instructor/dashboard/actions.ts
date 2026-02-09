@@ -6,14 +6,15 @@ import { revalidatePath } from "next/cache";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 
-import { fromZonedTime } from 'date-fns-tz';
-
 // Mock Email Function
-import { sendEmail } from "@/lib/email";
+import { sendEmail } from "@/lib/mail";
 
 export async function getInstructorShifts() {
     const session = await auth();
+    console.log("DEBUG: getInstructorShifts Session:", session?.user?.email, session?.user?.role, session?.user?.id);
+
     if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {
+        console.log("DEBUG: Unauthorized or not INSTRUCTOR");
         return [];
     }
 
@@ -36,48 +37,6 @@ export async function getInstructorShifts() {
 
     return shifts;
 }
-
-export async function getAllShifts() {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") return [];
-
-    return await prisma.shift.findMany({
-        where: {
-            isPublished: true,
-            // You might want to filter past shifts for master schedule to reduce load, or keep all.
-            // Let's keep all for now or current month +/-. For master view usually recent/future.
-            start: {
-                gte: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1) // From last month
-            }
-        },
-        include: {
-            instructor: { select: { id: true, name: true } },
-            bookings: {
-                include: { student: { select: { name: true } } }
-            }
-        },
-        orderBy: { start: 'asc' }
-    });
-}
-
-export async function getInstructorHistory() {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") return [];
-
-    return await prisma.booking.findMany({
-        where: {
-            shift: { instructorId: session.user.id }
-        },
-        include: {
-            student: { select: { name: true } },
-            shift: true,
-            report: true
-        },
-        orderBy: { shift: { start: 'desc' } }
-    });
-}
-
-
 
 export async function getInstructorRequests() {
     const session = await auth();
@@ -138,22 +97,8 @@ export async function createShift(formData: FormData) {
         return { error: "Missing fields" };
     }
 
-    // Parse as JST
-    const startDateTime = fromZonedTime(`${dateStr} ${startTime}`, 'Asia/Tokyo');
-    const endDateTime = fromZonedTime(`${dateStr} ${endTime}`, 'Asia/Tokyo');
-
-    // Check for overlaps
-    const overlap = await prisma.shift.findFirst({
-        where: {
-            instructorId: session.user.id,
-            start: { lt: endDateTime },
-            end: { gt: startDateTime }
-        }
-    });
-
-    if (overlap) {
-        return { error: "同時間帯に既にシフトが存在します" };
-    }
+    const startDateTime = new Date(`${dateStr}T${startTime}:00`);
+    const endDateTime = new Date(`${dateStr}T${endTime}:00`);
 
     try {
         const shift = await prisma.shift.create({
@@ -203,8 +148,16 @@ export async function submitReport(bookingId: string, formData: FormData) {
     const deadline = new Date(shiftStart);
     deadline.setHours(23, 59, 59, 999);
 
+    // Get extension hours setting
+    const setting = await prisma.globalSettings.findUnique({
+        where: { key: "CARTE_DEADLINE_EXTENSION_HOURS" }
+    });
+    const extensionHours = parseInt(setting?.value || "0", 10);
+    deadline.setHours(deadline.getHours() + extensionHours);
+
+    let warning = null;
     if (now > deadline) {
-        return { error: "提出期限切れです（当日23:59まで）。管理者に連絡してください。" };
+        warning = "提出期限を過ぎています。遅延提出として記録されました。次回からは期限内に提出するようにしてください。";
     }
 
     try {
@@ -218,7 +171,7 @@ export async function submitReport(bookingId: string, formData: FormData) {
             }
         });
         revalidatePath("/instructor/dashboard");
-        return { success: true };
+        return { success: true, warning };
     } catch {
         return { error: "Failed to submit report" };
     }
@@ -249,6 +202,9 @@ export async function deleteShift(shiftId: string) {
     }
 
     try {
+        // Collect bookings to notify before deleting
+        const bookingsToNotify = shift.bookings.filter(b => b.status === "CONFIRMED");
+
         await prisma.$transaction(async (tx) => {
             // Delete bookings first (cascade manually)
             await tx.booking.deleteMany({
@@ -260,82 +216,45 @@ export async function deleteShift(shiftId: string) {
             });
         });
 
+        // 4. 予約キャンセル確定 (双方)
+        // 件名: 予約がキャンセルされました。
+        // 本文: [時間] [授業場所] [授業種別] [講師名] 講師の予約がキャンセルされました。
+
+        const dateStr = format(shiftStart, "MM/dd", { locale: ja });
+        const timeStr = `${format(shiftStart, "HH:mm", { locale: ja })} - ${format(new Date(shift.end), "HH:mm", { locale: ja })}`;
+
+        // Need to refetch or assume shift structure. shift variable has bookings, but we need instructor name etc.
+        // `shift` from `findUnique` above has `bookings` but shift itself has `instructorId`.
+        // We need instructor name.
+        const instructor = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true, email: true } });
+        const instructorName = instructor?.name || "講師";
+        const instructorEmail = instructor?.email;
+
+        const locationText = shift.location === 'ONLINE' ? 'オンライン' :
+            shift.location === 'TACHIKAWA' ? '立川校舎' :
+                shift.location === 'KICHIJOJI' ? '吉祥寺校舎' : 'オンライン';
+        const typeText = shift.type === 'INDIVIDUAL' ? '個別指導' : shift.type === 'GROUP' ? '集団授業' : '特別授業';
+
+        const body = `${dateStr} ${timeStr} ${locationText} ${typeText} ${instructorName} 講師の予約がキャンセルされました。`;
+
+        // Notify Students
+        for (const booking of bookingsToNotify) {
+            const student = await prisma.user.findUnique({ where: { id: booking.studentId } });
+            if (student?.email) {
+                await sendEmail(student.email, "予約がキャンセルされました。", body);
+            }
+        }
+
+        // Notify Instructor (Confirmation)
+        if (instructorEmail) {
+            await sendEmail(instructorEmail, "予約がキャンセルされました。", body);
+        }
+
         revalidatePath("/instructor/dashboard");
         return { success: true };
     } catch (e) {
         console.error("Delete shift error:", e);
         return { error: "Failed to delete shift" };
-    }
-}
-
-// 予約作成（講師による強制予約）
-export async function createBooking(shiftId: string, studentId: string) {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {
-        return { error: "Unauthorized" };
-    }
-
-    const shift = await prisma.shift.findUnique({
-        where: { id: shiftId },
-        include: { bookings: true, instructor: true }
-    });
-
-    if (!shift) return { error: "Shift not found" };
-    if (!shift) return { error: "Shift not found" };
-    // Removed ownership check to allow cross-booking
-    // if (shift.instructorId !== session.user.id) return { error: "Not your shift" };
-
-    if (shift.bookings.some(b => b.status === "CONFIRMED")) {
-        return { error: "既に予約が入っています" };
-    }
-
-    const student = await prisma.user.findUnique({ where: { id: studentId } });
-    if (!student) return { error: "Student not found" };
-
-    // Check overlap for student
-    const studentOverlap = await prisma.booking.findFirst({
-        where: {
-            studentId,
-            status: "CONFIRMED",
-            shift: {
-                start: { lt: shift.end },
-                end: { gt: shift.start }
-            }
-        }
-    });
-
-    if (studentOverlap) {
-        return { error: "この生徒は同時間帯に既に授業予約があります" };
-    }
-
-    try {
-        await prisma.booking.create({
-            data: {
-                shiftId,
-                studentId,
-                status: "CONFIRMED",
-                meetingType: "ONLINE"
-            }
-        });
-
-        // Email to Student
-        await sendEmail({
-            to: student.email,
-            subject: "【予約確定】授業予約が完了しました",
-            body: `${student.name}様\n\n以下の通り授業予約が確定しました。\n\n日時: ${format(shift.start, "yyyy/MM/dd HH:mm", { locale: ja })} - ${format(shift.end, "HH:mm", { locale: ja })}\n担当: ${shift.instructor.name}\n場所: ${shift.location === 'ONLINE' ? 'オンライン' : shift.location}\n\n当日よろしくお願いいたします。`
-        });
-
-        // Email to Instructor
-        await sendEmail({
-            to: shift.instructor.email,
-            subject: "【予約確定】新規予約が入りました", // Instructor usually knows, but this confirms the action
-            body: `${shift.instructor.name}先生\n\n以下の授業予約を登録しました。\n\n日時: ${format(shift.start, "yyyy/MM/dd HH:mm", { locale: ja })}\n生徒: ${student.name}\n\nよろしくお願いいたします。`
-        });
-
-        revalidatePath("/instructor/dashboard");
-        return { success: true };
-    } catch {
-        return { error: "Failed to create booking" };
     }
 }
 
@@ -357,8 +276,8 @@ export async function approveRequest(requestId: string) {
                     instructorId: session.user.id as string,
                     start: request.start,
                     end: request.end,
-                    type: "INDIVIDUAL",
-                    location: "ONLINE", // Defaulting to ONLINE as per plan
+                    type: request.type, // Use request type
+                    location: request.location, // Use request location
                     isPublished: true,
                 }
             });
@@ -368,7 +287,7 @@ export async function approveRequest(requestId: string) {
                     studentId: request.studentId,
                     shiftId: shift.id,
                     status: "CONFIRMED",
-                    meetingType: "ONLINE"
+                    meetingType: request.location === 'ONLINE' ? 'ONLINE' : 'IN_PERSON' // Infer meeting type
                 }
             });
 
@@ -378,19 +297,22 @@ export async function approveRequest(requestId: string) {
             });
         });
 
-        // Email to Student
-        await sendEmail({
-            to: request.student.email,
-            subject: "日程リクエストが承認されました",
-            body: `${format(request.start, "MM/dd HH:mm", { locale: ja })} のリクエストが${request.instructor.name}講師により承認されました。`
-        });
+        // 2. リクエスト承認 (生徒宛)
+        // 件名: 日程リクエストが承認されました
+        // 本文: [日付] [時間] [授業場所] [授業種別] のリクエストが [講師名] 講師により承認されました。
 
-        // Email to Instructor (Self-copy)
-        await sendEmail({
-            to: request.instructor.email,
-            subject: "【確認】日程リクエストを承認しました",
-            body: `${request.student.name}様からのリクエスト（${format(request.start, "MM/dd HH:mm", { locale: ja })}）を承認し、予約を確定させました。`
-        });
+        const dateStr = format(request.start, "MM/dd", { locale: ja });
+        const timeStr = format(request.start, "HH:mm", { locale: ja });
+        const locationText = getLocationLabel(request.location); // Helper needed in this file too? Or assume standard string if already saved. 
+        // We added columns to ScheduleRequest, so they are available (TS might complain if schema not generated, but runtime is fine).
+        // getLocationLabel helper needs to be duplicated or imported. Let's simplify or duplicate for now.
+        const typeText = getTypeLabel(request.type);
+
+        await sendEmail(
+            request.student.email,
+            "日程リクエストが承認されました",
+            `${dateStr} ${timeStr} ${locationText} ${typeText} のリクエストが ${request.instructor.name} 講師により承認されました。`
+        );
 
         revalidatePath("/instructor/dashboard");
         return { success: true };
@@ -398,6 +320,20 @@ export async function approveRequest(requestId: string) {
         console.error(e);
         return { error: "Failed to approve request" };
     }
+}
+
+function getLocationLabel(loc: string) {
+    if (loc === 'KICHIJOJI') return '吉祥寺校舎';
+    if (loc === 'TACHIKAWA') return '立川校舎';
+    if (loc === 'ONLINE') return 'オンライン（推奨）';
+    return 'オンライン（推奨）';
+}
+
+function getTypeLabel(type: string) {
+    if (type === 'INDIVIDUAL') return '個別指導';
+    if (type === 'GROUP') return '集団授業';
+    if (type === 'SPECIAL') return '特別授業';
+    return '個別指導';
 }
 
 export async function rejectRequest(requestId: string) {
@@ -417,11 +353,15 @@ export async function rejectRequest(requestId: string) {
             data: { status: "REJECTED" }
         });
 
-        await sendEmail({
-            to: request.student.email,
-            subject: "日程リクエストが却下されました",
-            body: `リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。`
-        });
+        // 3. リクエスト却下 (生徒宛)
+        // 件名: 日程リクエストが却下されました
+        // 本文: リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。
+
+        await sendEmail(
+            request.student.email,
+            "日程リクエストが却下されました",
+            `リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。`
+        );
 
         revalidatePath("/instructor/dashboard");
         return { success: true };

@@ -3,64 +3,22 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { fromZonedTime } from "date-fns-tz";
 
 // ユーザー管理: 全ユーザー取得
 export async function getUsers() {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return [];
 
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
-
-    const users = await prisma.user.findMany({
+    return await prisma.user.findMany({
         where: { archivedAt: null },
         orderBy: { name: 'asc' },
         include: {
-            studentBookings: {
-                include: { shift: true, report: true }
-            },
-            instructorShifts: {
-                include: { bookings: { include: { report: true } } }
+            _count: {
+                select: { studentBookings: true, instructorShifts: true }
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             admissionResults: true
         } as any
-    });
-
-    return users.map((u: any) => {
-        // Instructor Stats
-        const monthPublished = u.instructorShifts ? u.instructorShifts.filter((s: any) => s.start >= firstDayOfMonth).length : 0;
-
-        const instructorBookings = u.instructorShifts ? u.instructorShifts.flatMap((s: any) => s.bookings.map((b: any) => ({ ...b, shift: s }))) : [];
-
-        const monthCompleted = instructorBookings.filter((b: any) =>
-            b.status === "CONFIRMED" &&
-            new Date(b.shift.start) >= firstDayOfMonth &&
-            (b.report || new Date(b.shift.start) < now)
-        ).length;
-
-        const yearCompleted = instructorBookings.filter((b: any) =>
-            b.status === "CONFIRMED" &&
-            new Date(b.shift.start) >= firstDayOfYear &&
-            (b.report || new Date(b.shift.start) < now)
-        ).length;
-
-        const totalCompleted = instructorBookings.filter((b: any) =>
-            b.status === "CONFIRMED" &&
-            (b.report || new Date(b.shift.start) < now)
-        ).length;
-
-        return {
-            ...u,
-            stats: {
-                monthPublished,
-                monthCompleted,
-                yearCompleted,
-                totalCompleted
-            }
-        };
     });
 }
 
@@ -210,31 +168,15 @@ export async function getMasterSchedule() {
 
 
 // 授業管理: 特権シフト作成（制限なし）
-export async function adminCreateShift(instructorId: string, dateStr: string, startTime: string, endTime: string, type: string) {
+export async function adminCreateShift(instructorId: string, date: Date, time: string) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
 
-    // Parse as JST (dateStr is "YYYY-MM-DD")
-    const startDateTime = fromZonedTime(`${dateStr} ${startTime}`, 'Asia/Tokyo');
-    const endDateTime = fromZonedTime(`${dateStr} ${endTime}`, 'Asia/Tokyo');
-
-    // Overlap Check for Admin
-    const overlap = await prisma.shift.findFirst({
-        where: {
-            instructorId,
-            start: { lt: endDateTime },
-            end: { gt: startDateTime }
-        }
-    });
-    if (overlap) return { error: "同時間帯に既にシフトが存在します" };
-
-    // If end < start, maybe it's next day? Or just user error?
-    // Let's assume user error or same day for now, as shifts are usually within a day.
-    if (endDateTime <= startDateTime) {
-        // Maybe crossing midnight?
-        // endDateTime.setDate(endDateTime.getDate() + 1);
-        // For now let's just create it as is (might show error if end < start in DB constraints if any/logic)
-    }
+    const [hours, minutes] = time.split(":").map(Number);
+    const startDateTime = new Date(date);
+    startDateTime.setHours(hours, minutes, 0, 0);
+    const endDateTime = new Date(startDateTime);
+    endDateTime.setHours(startDateTime.getHours() + 1); // Default 1 hour
 
     try {
         await prisma.shift.create({
@@ -242,9 +184,9 @@ export async function adminCreateShift(instructorId: string, dateStr: string, st
                 instructorId,
                 start: startDateTime,
                 end: endDateTime,
-                type: type as any, // Cast to enum if needed or string
+                type: "INDIVIDUAL",
                 isPublished: true,
-                location: "ONLINE" // Default for now
+                location: "ONLINE" // Default
             }
         });
         revalidatePath("/admin/dashboard");
@@ -338,10 +280,7 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
 
     const shift = await prisma.shift.findUnique({
         where: { id: shiftId },
-        include: {
-            bookings: { where: { status: "CONFIRMED" } },
-            instructor: true
-        }
+        include: { bookings: { where: { status: "CONFIRMED" } } }
     });
 
     if (!shift) return { error: "Shift not found" };
@@ -349,22 +288,6 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
     if (shift.type === "INDIVIDUAL" && shift.bookings.length > 0) {
         return { error: "既に予約が入っています" };
     }
-
-    const student = await prisma.user.findUnique({ where: { id: studentId } });
-    if (!student) return { error: "Student not found" };
-
-    // Overlap Check for Student (Admin)
-    const studentOverlap = await prisma.booking.findFirst({
-        where: {
-            studentId,
-            status: "CONFIRMED",
-            shift: {
-                start: { lt: shift.end },
-                end: { gt: shift.start }
-            }
-        }
-    });
-    if (studentOverlap) return { error: "この生徒は同時間帯に既に授業予約があります" };
 
     try {
         await prisma.booking.create({
@@ -375,22 +298,6 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
                 meetingType: "ONLINE"
             }
         });
-
-        // Email to Student
-        // Mock import sendEmail logic - ideally this should be a shared utility
-        console.log(`[EMAIL SIMULATION]`);
-        console.log(`To Student: ${student.email}`);
-        console.log(`Subject: 【予約確定】管理者により授業予約が追加されました`);
-        console.log(`Body: 日時: ${shift.start.toLocaleString("ja-JP")}\n担当: ${shift.instructor.name}`);
-        console.log("-------------------");
-
-        // Email to Instructor
-        console.log(`[EMAIL SIMULATION]`);
-        console.log(`To Instructor: ${shift.instructor.email}`);
-        console.log(`Subject: 【予約確定】管理者により新規予約が追加されました`);
-        console.log(`Body: 日時: ${shift.start.toLocaleString("ja-JP")}\n生徒: ${student.name}`);
-        console.log("-------------------");
-
         revalidatePath("/admin/dashboard");
         return { success: true };
     } catch (e) {

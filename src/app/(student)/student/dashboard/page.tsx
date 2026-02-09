@@ -3,15 +3,7 @@ import StudentDashboardClient from "./StudentDashboardClient";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/actions";
 
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-
 export default async function StudentDashboardPage() {
-    const session = await auth();
-    if (session?.user?.role === "INSTRUCTOR") {
-        redirect("/instructor/dashboard");
-    }
-
     const instructors = await getInstructors();
     const bookings = await getStudentBookings();
 

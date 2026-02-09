@@ -11,11 +11,11 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
+    createdAt: Date | string;
 }
 
 interface Booking {
     id: string;
-    status: string; // "CONFIRMED", "CANCELLED"
     shift: {
         start: Date;
         instructor: { name: string | null };
@@ -36,50 +36,20 @@ interface Student {
     name: string | null;
     email: string;
     studentBookings: Booking[];
-    admissionResults?: AdmissionResult[];
+    admissionResults?: AdmissionResult[]; // Optional as it might not be populated in all contexts? Wait, we fetch it now.
 }
 
 interface CarteViewerProps {
     students: Student[];
-    editable?: boolean;
+    editable?: boolean; // If true, allows editing admission results (Instructors/Admins)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateAdmission?: (studentId: string, results: any[]) => Promise<{ success?: boolean; error?: string }>;
 }
 
 export function CarteViewer({ students, editable, onUpdateAdmission }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-    const [searchQuery, setSearchQuery] = useState("");
-
-    const filteredStudents = students.filter(student => {
-        if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        // Check name
-        if (student.name?.toLowerCase().includes(query)) return true;
-        // Check admission results (Target School)
-        if (student.admissionResults?.some(res => res.schoolName.toLowerCase().includes(query))) return true;
-        return false;
-    });
 
     const formatDate = (d: Date) => format(new Date(d), "yyyy/MM/dd HH:mm");
-
-    const getStudentStats = (student: Student) => {
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-
-        const thisMonthBookings = student.studentBookings.filter(b => {
-            const d = new Date(b.shift.start);
-            return d.getMonth() === currentMonth && d.getFullYear() === currentYear && b.status !== "CANCELLED";
-        });
-
-        const thisMonthCompleted = thisMonthBookings.filter(b => {
-            if (b.status === "CANCELLED") return false;
-            if (b.report) return true;
-            return new Date(b.shift.start) < now;
-        });
-
-        return { total: thisMonthBookings.length, completed: thisMonthCompleted.length };
-    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -88,40 +58,27 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                 <CardHeader>
                     <CardTitle>生徒一覧</CardTitle>
                     <CardDescription>生徒を選択して過去のカルテを閲覧</CardDescription>
-                    <div className="pt-2">
-                        <Input
-                            placeholder="名前または志望校で検索..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {filteredStudents.length === 0 ? (
-                        <p className="text-muted-foreground">条件に一致する生徒がいません</p>
+                    {students.length === 0 ? (
+                        <p className="text-muted-foreground">生徒がいません</p>
                     ) : (
-                        filteredStudents.map((student) => {
-                            const stats = getStudentStats(student);
-                            return (
-                                <div
-                                    key={student.id}
-                                    className={`flex items-center gap-4 p-3 rounded cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${selectedStudent?.id === student.id ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
-                                    onClick={() => setSelectedStudent(student)}
-                                >
-                                    <Avatar>
-                                        <AvatarFallback>{student.name?.[0]}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                        <div className="font-semibold">{student.name}</div>
-                                        <div className="text-xs text-muted-foreground">{student.email}</div>
-                                        <div className="flex gap-3 mt-1 text-xs">
-                                            <span className="text-blue-600">全カルテ: {student.studentBookings.filter(b => b.report).length}</span>
-                                            <span className="text-slate-600">今月: {stats.completed}/{stats.total}</span>
-                                        </div>
-                                    </div>
+                        students.map(student => (
+                            <div
+                                key={student.id}
+                                className={`flex items-center gap-4 p-3 rounded cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${selectedStudent?.id === student.id ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
+                                onClick={() => setSelectedStudent(student)}
+                            >
+                                <Avatar>
+                                    <AvatarFallback>{student.name?.[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <div className="font-semibold">{student.name}</div>
+                                    <div className="text-xs text-muted-foreground">{student.email}</div>
+                                    <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentBookings.length}</div>
                                 </div>
-                            );
-                        })
+                            </div>
+                        ))
                     )}
                 </CardContent>
             </Card>
@@ -141,13 +98,11 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                             )}
                         </div>
 
-                        {/* Admission Results Summary (Moved to Top) */}
+                        {/* Admission Results Summary */}
                         {selectedStudent.admissionResults && selectedStudent.admissionResults.length > 0 && (
-                            <Card className="bg-slate-50 dark:bg-slate-900 border-none mb-6">
-                                <CardContent className="pt-4 pb-4">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="font-semibold text-sm">志望校・合否状況</h3>
-                                    </div>
+                            <Card className="bg-slate-50 dark:bg-slate-900 border-none">
+                                <CardContent className="pt-6">
+                                    <h3 className="font-semibold mb-2">志望校・合否状況</h3>
                                     <div className="flex flex-wrap gap-2">
                                         {selectedStudent.admissionResults.map(res => (
                                             <div key={res.id} className="bg-white dark:bg-black border rounded px-3 py-1 text-sm flex items-center gap-2">
@@ -163,8 +118,6 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                             </Card>
                         )}
 
-
-
                         {selectedStudent.studentBookings.length === 0 ? (
                             <Card>
                                 <CardContent className="p-6 text-center text-muted-foreground">
@@ -178,7 +131,16 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                                         <CardHeader>
                                             <CardTitle className="text-lg flex justify-between">
                                                 <span>{formatDate(booking.shift.start)}</span>
-                                                <span className="text-base font-normal text-muted-foreground">講師: {booking.shift.instructor.name}</span>
+                                                <div className="flex items-center gap-2">
+                                                    {(function () {
+                                                        const shiftEnd = new Date(booking.shift.start);
+                                                        shiftEnd.setHours(23, 59, 59, 999);
+                                                        const created = new Date(booking.report!.createdAt);
+                                                        const isLate = created > shiftEnd;
+                                                        return isLate ? <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">遅延提出</span> : null;
+                                                    })()}
+                                                    <span className="text-base font-normal text-muted-foreground">講師: {booking.shift.instructor.name}</span>
+                                                </div>
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
@@ -192,7 +154,7 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                                                     <p className="text-sm">{booking.report.homework || "なし"}</p>
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-semibold text-sm mb-1">生徒へのFB</h4>
+                                                    <h4 className="font-semibold text-sm mb-1">講師への連絡事項</h4>
                                                     <p className="text-sm">{booking.report.feedback || "なし"}</p>
                                                 </div>
                                             </div>
