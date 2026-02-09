@@ -42,12 +42,6 @@ interface Booking {
         instructor: { name: string | null };
     };
     meetingType?: string;
-    report: {
-        content: string;
-        logUrl: string | null;
-        homework: string | null;
-        feedback: string | null;
-    } | null;
 }
 
 export default function StudentDashboardClient({ instructors, initialBookings }: { instructors: User[], initialBookings: Booking[] }) {

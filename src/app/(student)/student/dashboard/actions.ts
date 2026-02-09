@@ -136,8 +136,7 @@ export async function getStudentBookings() {
         include: {
             shift: {
                 include: { instructor: { select: { name: true } } }
-            },
-            report: true
+            }
         },
         orderBy: {
             shift: { start: 'desc' }
