@@ -491,7 +491,7 @@ export async function updateStudentProfile(
         gpa?: number | null;
         qualifications?: string;
         canInternalUpgrade?: boolean | null;
-        dedicatedInstructorId?: string;
+        dedicatedInstructorName?: string | null;
     }
 ) {
     const session = await auth();
@@ -511,9 +511,22 @@ export async function updateStudentProfile(
             canInternalUpgrade: data.canInternalUpgrade,
         };
 
-        // Handle dedicated instructor
-        if (data.dedicatedInstructorId && data.dedicatedInstructorId !== "None") {
-            updateData.dedicatedInstructorId = data.dedicatedInstructorId;
+        // Handle dedicated instructor by name
+        if (data.dedicatedInstructorName && data.dedicatedInstructorName.trim() !== "") {
+            // Find instructor by name
+            const instructor = await prisma.user.findFirst({
+                where: {
+                    name: data.dedicatedInstructorName.trim(),
+                    role: "INSTRUCTOR"
+                }
+            });
+
+            if (instructor) {
+                updateData.dedicatedInstructorId = instructor.id;
+            } else {
+                // If instructor not found, set to null
+                updateData.dedicatedInstructorId = null;
+            }
         } else {
             updateData.dedicatedInstructorId = null;
         }

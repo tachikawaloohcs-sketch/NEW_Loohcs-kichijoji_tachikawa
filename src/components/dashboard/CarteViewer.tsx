@@ -241,7 +241,7 @@ function ProfileInfoCard({
         gpa: student.gpa?.toString() || "",
         qualifications: student.qualifications || "",
         canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
-        dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
+        dedicatedInstructorName: student.dedicatedInstructor?.name || ""
     });
 
     const handleSave = async () => {
@@ -249,7 +249,8 @@ function ProfileInfoCard({
         const payload = {
             ...formData,
             gpa: formData.gpa ? parseFloat(formData.gpa) : null,
-            canInternalUpgrade: formData.canInternalUpgrade === "true" ? true : formData.canInternalUpgrade === "false" ? false : null
+            canInternalUpgrade: formData.canInternalUpgrade === "true" ? true : formData.canInternalUpgrade === "false" ? false : null,
+            dedicatedInstructorName: formData.dedicatedInstructorName || null
         };
         await onUpdate(student.id, payload);
         setIsEditing(false);
@@ -263,7 +264,7 @@ function ProfileInfoCard({
             gpa: student.gpa?.toString() || "",
             qualifications: student.qualifications || "",
             canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
-            dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
+            dedicatedInstructorName: student.dedicatedInstructor?.name || ""
         });
         setIsEditing(false);
     };
@@ -325,17 +326,7 @@ function ProfileInfoCard({
                         </div>
                         <div className="space-y-2">
                             <Label>専任講師</Label>
-                            <Select value={formData.dedicatedInstructorId} onValueChange={v => setFormData({ ...formData, dedicatedInstructorId: v })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="担当なし" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="None">担当なし</SelectItem>
-                                    {allInstructors.map(inst => (
-                                        <SelectItem key={inst.id} value={inst.id}>{inst.name || "名称未設定"}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Input value={formData.dedicatedInstructorName} onChange={e => setFormData({ ...formData, dedicatedInstructorName: e.target.value })} placeholder="講師名を入力" />
                         </div>
                     </div>
                 ) : (
