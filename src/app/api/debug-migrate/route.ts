@@ -1,43 +1,89 @@
 
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get('secret');
 
+    // Simple protection
     if (secret !== 'loohcs-admin-fix-2026') {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     try {
-        console.log("Starting manual migration via API (Async Mode)...");
+        console.log("Starting RAW SQL migration...");
 
-        // Execute in background without awaiting
-        execAsync('prisma db push --accept-data-loss --schema=./prisma/schema.prisma')
-            .then(({ stdout, stderr }) => {
-                console.log("Async Migration Success:");
-                console.log("STDOUT:", stdout);
-                if (stderr) console.log("STDERR:", stderr);
-            })
-            .catch((error) => {
-                console.error("Async Migration Failed:", error);
-            });
+        // 1. Get a valid user ID to backfill (The admin we just fixed)
+        const admin = await prisma.user.findUnique({
+            where: { email: 'tachikawa.loohcs@gmail.com' }
+        });
+
+        if (!admin) {
+            return NextResponse.json({ error: 'Admin user not found, cannot backfill data.' }, { status: 400 });
+        }
+
+        const fallbackId = admin.id;
+        const logs: string[] = [];
+
+        // 2. Add column as NULLABLE first
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Shift" ADD COLUMN IF NOT EXISTS "instructorId" TEXT;`);
+            logs.push("Added column instructorId (nullable)");
+        } catch (e) {
+            logs.push(`Column add failed (might exist): ${e}`);
+        }
+
+        // 3. Backfill data
+        // Explicitly cast to text to avoid parameter type issues if any
+        const updateCount = await prisma.$executeRawUnsafe(`UPDATE "Shift" SET "instructorId" = '${fallbackId}' WHERE "instructorId" IS NULL;`);
+        logs.push(`Updated ${updateCount} shifts with default instructor ID`);
+
+        // 4. Make NOT NULL
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE "Shift" ALTER COLUMN "instructorId" SET NOT NULL;`);
+            logs.push("Altered column instructorId to NOT NULL");
+        } catch (e) {
+            logs.push(`Set NOT NULL failed: ${e}`);
+        }
+
+        // 5. Add Foreign Key (Optional but good)
+        try {
+            // Check if constraint exists first to avoid error? roughly
+            // We'll just try to add it, if it fails it likely exists
+            await prisma.$executeRawUnsafe(`
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Shift_instructorId_fkey') THEN
+                        ALTER TABLE "Shift"
+                        ADD CONSTRAINT "Shift_instructorId_fkey"
+                        FOREIGN KEY ("instructorId") REFERENCES "User"("id")
+                        ON DELETE RESTRICT ON UPDATE CASCADE;
+                    END IF;
+                END $$;
+             `);
+            logs.push("Added Foreign Key constraint");
+        } catch (e) {
+            logs.push(`FK creation failed (simple check): ${e}`);
+            // Fallback for simple query if DO block fails (e.g. insufficient privs or transaction block issues)
+            try {
+                await prisma.$executeRawUnsafe(`ALTER TABLE "Shift" ADD CONSTRAINT "Shift_instructorId_fkey" FOREIGN KEY ("instructorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;`);
+            } catch (e2) {
+                logs.push(`Fallback FK creation failed: ${e2}`);
+            }
+        }
 
         return NextResponse.json({
             success: true,
-            message: "Migration started in background. Please check server logs in Google Cloud Console in 30-60 seconds."
+            logs,
+            adminId: fallbackId
         });
+
     } catch (error) {
-        console.error("Migration failed:", error);
+        console.error("Raw SQL Migration failed:", error);
         return NextResponse.json({
             success: false,
-            error: String(error),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            details: (error as any).message
+            error: String(error)
         }, { status: 500 });
     }
 }
