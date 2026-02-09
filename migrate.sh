@@ -2,12 +2,17 @@
 # Fix cache permission issues for npx/npm
 export HOME=/tmp
 
-# Run migration
-echo "Running prisma db push via global CLI..."
-if [ -z "$DATABASE_URL" ]; then
-  echo "Error: DATABASE_URL is not set."
-  exit 1
-fi
+echo "=== STARTING CONTAINER STARTUP SCRIPT ==="
+echo "PORT: $PORT"
+echo "DATABASE_URL is set: $(if [ -z "$DATABASE_URL" ]; then echo "NO"; else echo "YES"; fi)"
 
-# Use global prisma command
-prisma db push --accept-data-loss --schema=./prisma/schema.prisma
+# Check prisma availability
+echo "Checking prisma CLI..."
+which prisma || echo "Prisma not found in path"
+prisma --version || echo "Prisma version check failed"
+
+# Run migration (Allow failure to let app start)
+echo "Running prisma db push via global CLI..."
+prisma db push --accept-data-loss --schema=./prisma/schema.prisma || echo "WARNING: Migration failed, but continuing application startup..."
+
+echo "=== STARTING SERVER ==="
