@@ -17,6 +17,7 @@ interface Report {
     feedback: string | null;
     logUrl: string | null;
     createdAt: Date | string;
+    updatedAt: Date | string;
 }
 
 interface User {

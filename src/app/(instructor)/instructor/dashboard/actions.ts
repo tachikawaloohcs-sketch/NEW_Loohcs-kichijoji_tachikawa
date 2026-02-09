@@ -161,8 +161,15 @@ export async function submitReport(bookingId: string, formData: FormData) {
     }
 
     try {
-        await prisma.report.create({
-            data: {
+        await prisma.report.upsert({
+            where: { bookingId: bookingId },
+            update: {
+                content,
+                logUrl,
+                homework,
+                feedback
+            },
+            create: {
                 bookingId: bookingId,
                 content,
                 logUrl,

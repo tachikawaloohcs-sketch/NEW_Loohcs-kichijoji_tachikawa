@@ -12,6 +12,7 @@ interface Report {
     feedback: string | null;
     logUrl: string | null;
     createdAt: Date | string;
+    updatedAt: Date | string;
 }
 
 interface Booking {
@@ -138,6 +139,14 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
                                                         const created = new Date(booking.report!.createdAt);
                                                         const isLate = created > shiftEnd;
                                                         return isLate ? <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">遅延提出</span> : null;
+                                                    })()}
+                                                    {(function () {
+                                                        const created = new Date(booking.report!.createdAt);
+                                                        const updated = new Date(booking.report!.updatedAt);
+                                                        if (updated.getTime() - created.getTime() > 60 * 1000) {
+                                                            return <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">編集済</span>;
+                                                        }
+                                                        return null;
                                                     })()}
                                                     <span className="text-base font-normal text-muted-foreground">講師: {booking.shift.instructor.name}</span>
                                                 </div>

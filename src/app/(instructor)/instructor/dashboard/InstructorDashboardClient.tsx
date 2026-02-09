@@ -30,7 +30,7 @@ interface Booking {
     id: string;
     status: string;
     student: { name: string | null };
-    report: { id: string } | null;
+    report: Report | null;
 }
 
 interface Shift {
@@ -58,6 +58,7 @@ interface Report {
     feedback: string | null;
     logUrl: string | null;
     createdAt: Date | string;
+    updatedAt: Date | string;
 }
 
 interface StudentBooking {
@@ -123,6 +124,7 @@ export default function InstructorDashboardClient({
     // Report Dialog State
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
     const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+    const [reportDefaults, setReportDefaults] = useState<Report | null>(null);
 
     // Shift Form State
     const [startTime, setStartTime] = useState("10:00");
@@ -207,8 +209,9 @@ export default function InstructorDashboardClient({
         return dates;
     }, [currentShifts]);
 
-    const openReportDialog = (bookingId: string) => {
+    const openReportDialog = (bookingId: string, existingReport?: Report | null) => {
         setSelectedBookingId(bookingId);
+        setReportDefaults(existingReport || null);
         setIsReportDialogOpen(true);
     };
 
@@ -298,7 +301,10 @@ export default function InstructorDashboardClient({
                                                     {shift.className && <div className="text-xs text-muted-foreground">{shift.className}</div>}
                                                 </div>
                                                 {booking.report ? (
-                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">提出済み</Badge>
+                                                    <div className="flex gap-2 items-center">
+                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">提出済み</Badge>
+                                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openReportDialog(booking.id, booking.report)}>編集</Button>
+                                                    </div>
                                                 ) : (
                                                     <Button size="sm" onClick={() => openReportDialog(booking.id)}>カルテを書く</Button>
                                                 )}
@@ -370,7 +376,12 @@ export default function InstructorDashboardClient({
                                                                             const isStarted = new Date(shift.start) < new Date();
 
                                                                             if (hasReport) {
-                                                                                return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">提出済み</Badge>;
+                                                                                return (
+                                                                                    <div className="flex gap-2 items-center">
+                                                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">提出済み</Badge>
+                                                                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openReportDialog(confirmedBooking.id, confirmedBooking.report)}>編集</Button>
+                                                                                    </div>
+                                                                                );
                                                                             } else if (isStarted) {
                                                                                 return <Button size="sm" onClick={() => openReportDialog(confirmedBooking.id)} className="h-7 text-xs bg-orange-600 hover:bg-orange-700 text-white">カルテを書く</Button>;
                                                                             }
@@ -589,7 +600,10 @@ export default function InstructorDashboardClient({
                                             </div>
                                             <div>
                                                 {booking.report ? (
-                                                    <Badge className="bg-slate-700 hover:bg-slate-800 text-white">カルテ提出済</Badge>
+                                                    <div className="flex gap-2 items-center">
+                                                        <Badge className="bg-slate-700 hover:bg-slate-800 text-white">カルテ提出済</Badge>
+                                                        <Button size="sm" variant="ghost" onClick={() => openReportDialog(booking.id, booking.report)}>編集</Button>
+                                                    </div>
                                                 ) : (
                                                     <Button
                                                         size="sm"
@@ -712,19 +726,19 @@ export default function InstructorDashboardClient({
                         <div className="grid gap-4 py-4">
                             <div className="space-y-2">
                                 <Label>本日の実施内容（所感含む正直な記録）</Label>
-                                <Textarea name="content" required placeholder="授業内容と生徒の様子..." className="h-24" />
+                                <Textarea name="content" required placeholder="授業内容と生徒の様子..." className="h-24" defaultValue={reportDefaults?.content || ""} />
                             </div>
                             <div className="space-y-2">
                                 <Label>該当ログURL</Label>
-                                <Input name="logUrl" placeholder="https://..." />
+                                <Input name="logUrl" placeholder="https://..." defaultValue={reportDefaults?.logUrl || ""} />
                             </div>
                             <div className="space-y-2">
                                 <Label>宿題</Label>
-                                <Input name="homework" placeholder="P.24-25, 単語テスト" />
+                                <Input name="homework" placeholder="P.24-25, 単語テスト" defaultValue={reportDefaults?.homework || ""} />
                             </div>
                             <div className="space-y-2">
                                 <Label>生徒への申し送り事項</Label>
-                                <Textarea name="feedback" placeholder="次回までに復習しておくこと..." />
+                                <Textarea name="feedback" placeholder="次回までに復習しておくこと..." defaultValue={reportDefaults?.feedback || ""} />
                             </div>
                         </div>
                         <DialogFooter>
