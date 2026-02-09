@@ -13,16 +13,36 @@ if [ -z "$PROJECT_ID" ]; then echo "Project ID is required."; exit 1; fi
 read -p "Enter Region (default: asia-northeast1): " REGION
 REGION=${REGION:-asia-northeast1}
 
-# 3. Ask for Cloud SQL Connection Name
 echo ""
-echo "Find this in Cloud SQL Overview (Example: project-id:asia-northeast1:my-db)"
-read -p "Enter Cloud SQL Connection Name: " INSTANCE_CONNECTION_NAME
-if [ -z "$INSTANCE_CONNECTION_NAME" ]; then echo "Connection Name is required."; exit 1; fi
+echo "Are you using Google Cloud SQL? (y/n)"
+read -p "Database Type: " IS_CLOUDSQL
 
-# 4. Ask for DB Password
-echo ""
-read -s -p "Enter DB Password for 'postgres' user: " DB_PASSWORD
-echo ""
+if [[ "$IS_CLOUDSQL" =~ ^[Yy]$ ]]; then
+  # 3. Ask for Cloud SQL Connection Name
+  echo ""
+  echo "Find this in Cloud SQL Overview (Example: project-id:asia-northeast1:my-db)"
+  read -p "Enter Cloud SQL Connection Name: " INSTANCE_CONNECTION_NAME
+  if [ -z "$INSTANCE_CONNECTION_NAME" ]; then echo "Connection Name is required."; exit 1; fi
+
+  # 4. Ask for DB Password
+  echo ""
+  read -s -p "Enter DB Password for 'postgres' user: " DB_PASSWORD
+  echo ""
+  
+  DATABASE_URL_ENV="DATABASE_URL=postgresql://postgres:$DB_PASSWORD@localhost/reservation-db?host=/cloudsql/$INSTANCE_CONNECTION_NAME"
+  CLOUDSQL_FLAG="--add-cloudsql-instances $INSTANCE_CONNECTION_NAME"
+  
+else
+  # External DB (Supabase, Neon, etc.)
+  echo ""
+  echo "Enter your full Database connection string (e.g., postgresql://user:pass@host:port/dbname)"
+  read -s -p "Database URL: " EXTERNAL_DB_URL
+  echo ""
+  if [ -z "$EXTERNAL_DB_URL" ]; then echo "Database URL is required."; exit 1; fi
+  
+  DATABASE_URL_ENV="DATABASE_URL=$EXTERNAL_DB_URL"
+  CLOUDSQL_FLAG=""
+fi
 
 # 5. Generate Auth Secret if not provided
 AUTH_SECRET=$(openssl rand -base64 32)
@@ -33,22 +53,35 @@ echo ""
 echo "========================================================"
 echo "Starting Deployment..."
 echo "Target: $PROJECT_ID / $REGION"
-echo "Database: $INSTANCE_CONNECTION_NAME"
+if [[ "$IS_CLOUDSQL" =~ ^[Yy]$ ]]; then
+  echo "Database: Cloud SQL ($INSTANCE_CONNECTION_NAME)"
+else
+  echo "Database: External DB"
+fi
 echo "========================================================"
 echo ""
 
-# Execute Deploy Command
-gcloud run deploy reservation-service \
+# Construct the command
+CMD="gcloud run deploy reservation-service \
   --source . \
-  --region "$REGION" \
+  --region $REGION \
   --platform managed \
   --allow-unauthenticated \
-  --project "$PROJECT_ID" \
-  --add-cloudsql-instances "$INSTANCE_CONNECTION_NAME" \
-  --set-env-vars "DATABASE_URL=postgresql://postgres:$DB_PASSWORD@localhost/reservation-db?host=/cloudsql/$INSTANCE_CONNECTION_NAME" \
-  --set-env-vars "AUTH_SECRET=$AUTH_SECRET" \
+  --project $PROJECT_ID \
+  --set-env-vars \"$DATABASE_URL_ENV\" \
+  --set-env-vars \"AUTH_SECRET=$AUTH_SECRET\" \
+  --set-env-vars \"AUTH_TRUST_HOST=true\" \
+  --set-env-vars \"NEXTAUTH_URL=https://reservation-service-1062807300473.asia-northeast1.run.app\" \
   --memory 1Gi \
-  --timeout 600
+  --timeout 600"
+
+# Add Cloud SQL flag only if needed
+if [ -n "$CLOUDSQL_FLAG" ]; then
+  CMD="$CMD $CLOUDSQL_FLAG"
+fi
+
+# Execute
+eval $CMD
 
 echo ""
 echo "Done!"

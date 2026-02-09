@@ -4,6 +4,8 @@ import AdminDashboardClient from "./AdminDashboardClient";
 import { redirect } from "next/navigation";
 import { getUsers, getAllInstructors, getMasterSchedule, getGlobalSettings } from "./actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDashboardPage() {
     const session = await auth();
     if (!session?.user || session.user.role !== "ADMIN") {

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
-import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult } from "./actions";
+import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile } from "./actions";
 
 type ShiftType = "individual" | "group" | "special" | "beginner" | "trial";
 
@@ -532,7 +532,7 @@ export default function InstructorDashboardClient({
 
                     {/* Report Dialog: UPDATE HERE */}
                     <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-                        <DialogContent className="max-w-2xl">
+                        <DialogContent className="max-w-4xl">
                             <DialogHeader>
                                 <DialogTitle>授業カルテの入力</DialogTitle>
                                 <DialogDescription>
@@ -628,6 +628,7 @@ export default function InstructorDashboardClient({
                         students={students}
                         editable={true}
                         onUpdateAdmission={updateAdmissionResult}
+                        onUpdateProfile={updateStudentProfile}
                     />
                 </TabsContent>
 
@@ -715,7 +716,7 @@ export default function InstructorDashboardClient({
 
             {/* Report Dialog */}
             <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>授業カルテの入力</DialogTitle>
                         <DialogDescription>

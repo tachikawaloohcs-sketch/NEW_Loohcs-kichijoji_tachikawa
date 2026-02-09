@@ -5,6 +5,8 @@ import { logout } from "@/lib/actions";
 
 import { auth } from "@/auth"; // Import auth
 
+export const dynamic = "force-dynamic";
+
 export default async function InstructorDashboardPage() {
     console.log("----------------------------------------------------------------");
     console.log("SERVER SIDE RENDERING: InstructorDashboardPage START");
@@ -29,7 +31,7 @@ export default async function InstructorDashboardPage() {
         } : undefined;
 
         return (
-            <div className="p-8 space-y-8 max-w-5xl mx-auto">
+            <div className="p-8 space-y-8 max-w-7xl mx-auto">
                 <header className="flex justify-between items-center border-b pb-4">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">講師ダッシュボード</h1>

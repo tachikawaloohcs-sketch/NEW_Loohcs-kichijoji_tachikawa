@@ -480,3 +480,53 @@ export async function getGlobalSettings(key: string) {
         return { value: null };
     }
 }
+
+// Update Student Profile
+export async function updateStudentProfile(
+    studentId: string,
+    data: {
+        schoolName?: string;
+        grade?: string;
+        researchTheme?: string;
+        gpa?: number | null;
+        qualifications?: string;
+        canInternalUpgrade?: boolean | null;
+        dedicatedInstructorId?: string;
+    }
+) {
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) {
+        return { error: "Unauthorized" };
+    }
+
+    try {
+        // Prepare update data
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updateData: any = {
+            schoolName: data.schoolName || null,
+            grade: data.grade || null,
+            researchTheme: data.researchTheme || null,
+            gpa: data.gpa,
+            qualifications: data.qualifications || null,
+            canInternalUpgrade: data.canInternalUpgrade,
+        };
+
+        // Handle dedicated instructor
+        if (data.dedicatedInstructorId && data.dedicatedInstructorId !== "None") {
+            updateData.dedicatedInstructorId = data.dedicatedInstructorId;
+        } else {
+            updateData.dedicatedInstructorId = null;
+        }
+
+        await prisma.user.update({
+            where: { id: studentId },
+            data: updateData
+        });
+
+        revalidatePath("/instructor/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update student profile:", error);
+        return { error: "Failed to update student profile" };
+    }
+}

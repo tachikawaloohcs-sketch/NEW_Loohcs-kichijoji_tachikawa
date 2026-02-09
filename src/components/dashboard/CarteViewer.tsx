@@ -121,41 +121,12 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                         </div>
 
                         {/* Student Profile Info */}
-                        <Card className="bg-white dark:bg-slate-950">
-                            <CardContent className="pt-6">
-                                <h3 className="font-semibold mb-4 border-b pb-2">基本情報</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">所属高校</span>
-                                        <span className="col-span-2">{selectedStudent.schoolName || "-"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">学年</span>
-                                        <span className="col-span-2">{selectedStudent.grade || "-"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">研究テーマ</span>
-                                        <span className="col-span-2">{selectedStudent.researchTheme || "-"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">評定平均</span>
-                                        <span className="col-span-2">{selectedStudent.gpa || "-"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">内部進学</span>
-                                        <span className="col-span-2">{selectedStudent.canInternalUpgrade === null ? "-" : selectedStudent.canInternalUpgrade ? "可能" : "不可"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        <span className="text-muted-foreground font-medium">専任講師</span>
-                                        <span className="col-span-2">{selectedStudent.dedicatedInstructor?.name || "-"}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 col-span-1 md:col-span-2">
-                                        <span className="text-muted-foreground font-medium">資格・実績</span>
-                                        <span className="col-span-2 whitespace-pre-wrap">{selectedStudent.qualifications || "-"}</span>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <ProfileInfoCard
+                            student={selectedStudent}
+                            allInstructors={allInstructors}
+                            editable={editable}
+                            onUpdate={onUpdateProfile}
+                        />
 
                         {/* Admission Results Summary */}
                         {selectedStudent.admissionResults && selectedStudent.admissionResults.length > 0 && (
@@ -246,6 +217,161 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                 )}
             </div>
         </div>
+    );
+}
+
+// Profile Info Card with Inline Editing
+function ProfileInfoCard({
+    student,
+    allInstructors,
+    editable,
+    onUpdate
+}: {
+    student: Student;
+    allInstructors: { id: string; name: string | null }[];
+    editable?: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onUpdate?: (studentId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
+}) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [formData, setFormData] = useState({
+        schoolName: student.schoolName || "",
+        grade: student.grade || "",
+        researchTheme: student.researchTheme || "",
+        gpa: student.gpa?.toString() || "",
+        qualifications: student.qualifications || "",
+        canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
+        dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
+    });
+
+    const handleSave = async () => {
+        if (!onUpdate) return;
+        const payload = {
+            ...formData,
+            gpa: formData.gpa ? parseFloat(formData.gpa) : null,
+            canInternalUpgrade: formData.canInternalUpgrade === "true" ? true : formData.canInternalUpgrade === "false" ? false : null
+        };
+        await onUpdate(student.id, payload);
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setFormData({
+            schoolName: student.schoolName || "",
+            grade: student.grade || "",
+            researchTheme: student.researchTheme || "",
+            gpa: student.gpa?.toString() || "",
+            qualifications: student.qualifications || "",
+            canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
+            dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
+        });
+        setIsEditing(false);
+    };
+
+    return (
+        <Card className="bg-white dark:bg-slate-950">
+            <CardContent className="pt-6">
+                <div className="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 className="font-semibold">基本情報</h3>
+                    {editable && onUpdate && (
+                        <div className="flex gap-2">
+                            {isEditing ? (
+                                <>
+                                    <Button variant="outline" size="sm" onClick={handleCancel}>キャンセル</Button>
+                                    <Button size="sm" onClick={handleSave}>保存</Button>
+                                </>
+                            ) : (
+                                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>編集</Button>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {isEditing ? (
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>所属高校</Label>
+                                <Input value={formData.schoolName} onChange={e => setFormData({ ...formData, schoolName: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>学年</Label>
+                                <Input value={formData.grade} onChange={e => setFormData({ ...formData, grade: e.target.value })} placeholder="例: 高2" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>研究テーマ</Label>
+                            <Input value={formData.researchTheme} onChange={e => setFormData({ ...formData, researchTheme: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>評定平均</Label>
+                            <Input type="number" step="0.1" value={formData.gpa} onChange={e => setFormData({ ...formData, gpa: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>内部進学の可否</Label>
+                            <Select value={formData.canInternalUpgrade} onValueChange={v => setFormData({ ...formData, canInternalUpgrade: v })}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="選択してください" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="true">可能</SelectItem>
+                                    <SelectItem value="false">不可</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>資格・実績</Label>
+                            <Input value={formData.qualifications} onChange={e => setFormData({ ...formData, qualifications: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>専任講師</Label>
+                            <Select value={formData.dedicatedInstructorId} onValueChange={v => setFormData({ ...formData, dedicatedInstructorId: v })}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="担当なし" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="None">担当なし</SelectItem>
+                                    {allInstructors.map(inst => (
+                                        <SelectItem key={inst.id} value={inst.id}>{inst.name || "名称未設定"}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">所属高校</span>
+                            <span className="col-span-2">{student.schoolName || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">学年</span>
+                            <span className="col-span-2">{student.grade || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">研究テーマ</span>
+                            <span className="col-span-2">{student.researchTheme || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">評定平均</span>
+                            <span className="col-span-2">{student.gpa || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">内部進学</span>
+                            <span className="col-span-2">{student.canInternalUpgrade === null ? "-" : student.canInternalUpgrade ? "可能" : "不可"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            <span className="text-muted-foreground font-medium">専任講師</span>
+                            <span className="col-span-2">{student.dedicatedInstructor?.name || "-"}</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 col-span-1 md:col-span-2">
+                            <span className="text-muted-foreground font-medium">資格・実績</span>
+                            <span className="col-span-2 whitespace-pre-wrap">{student.qualifications || "-"}</span>
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 
