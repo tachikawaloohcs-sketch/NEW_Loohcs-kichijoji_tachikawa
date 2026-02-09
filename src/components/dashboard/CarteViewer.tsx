@@ -4,6 +4,12 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2 } from "lucide-react";
 
 interface Report {
     id: string;
@@ -37,17 +43,28 @@ interface Student {
     name: string | null;
     email: string;
     studentBookings: Booking[];
-    admissionResults?: AdmissionResult[]; // Optional as it might not be populated in all contexts? Wait, we fetch it now.
+    admissionResults?: AdmissionResult[];
+    // Profile Fields
+    schoolName?: string | null;
+    grade?: string | null;
+    researchTheme?: string | null;
+    gpa?: number | null;
+    qualifications?: string | null;
+    canInternalUpgrade?: boolean | null;
+    dedicatedInstructor?: { id: string; name: string | null } | null;
 }
 
 interface CarteViewerProps {
     students: Student[];
+    allInstructors?: { id: string; name: string | null }[]; // For dedicated instructor selection
     editable?: boolean; // If true, allows editing admission results (Instructors/Admins)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateAdmission?: (studentId: string, results: any[]) => Promise<{ success?: boolean; error?: string }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onUpdateProfile?: (studentId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
 }
 
-export function CarteViewer({ students, editable, onUpdateAdmission }: CarteViewerProps) {
+export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
     const formatDate = (d: Date) => format(new Date(d), "yyyy/MM/dd HH:mm");
@@ -88,16 +105,57 @@ export function CarteViewer({ students, editable, onUpdateAdmission }: CarteView
             <div className="md:col-span-2 space-y-6">
                 {selectedStudent ? (
                     <>
-                        {/* Student Header with Admission Info */}
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-2xl font-bold">{selectedStudent.name} さんのカルテ一覧</h2>
                                 <p className="text-muted-foreground">{selectedStudent.email}</p>
                             </div>
-                            {editable && onUpdateAdmission && (
-                                <AdmissionEditDialog student={selectedStudent} onUpdate={onUpdateAdmission} />
-                            )}
+                            <div className="flex gap-2">
+                                {editable && onUpdateProfile && (
+                                    <ProfileEditDialog student={selectedStudent} allInstructors={allInstructors} onUpdate={onUpdateProfile} />
+                                )}
+                                {editable && onUpdateAdmission && (
+                                    <AdmissionEditDialog student={selectedStudent} onUpdate={onUpdateAdmission} />
+                                )}
+                            </div>
                         </div>
+
+                        {/* Student Profile Info */}
+                        <Card className="bg-white dark:bg-slate-950">
+                            <CardContent className="pt-6">
+                                <h3 className="font-semibold mb-4 border-b pb-2">基本情報</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">所属高校</span>
+                                        <span className="col-span-2">{selectedStudent.schoolName || "-"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">学年</span>
+                                        <span className="col-span-2">{selectedStudent.grade || "-"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">研究テーマ</span>
+                                        <span className="col-span-2">{selectedStudent.researchTheme || "-"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">評定平均</span>
+                                        <span className="col-span-2">{selectedStudent.gpa || "-"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">内部進学</span>
+                                        <span className="col-span-2">{selectedStudent.canInternalUpgrade === null ? "-" : selectedStudent.canInternalUpgrade ? "可能" : "不可"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <span className="text-muted-foreground font-medium">専任講師</span>
+                                        <span className="col-span-2">{selectedStudent.dedicatedInstructor?.name || "-"}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 col-span-1 md:col-span-2">
+                                        <span className="text-muted-foreground font-medium">資格・実績</span>
+                                        <span className="col-span-2 whitespace-pre-wrap">{selectedStudent.qualifications || "-"}</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* Admission Results Summary */}
                         {selectedStudent.admissionResults && selectedStudent.admissionResults.length > 0 && (
@@ -212,13 +270,6 @@ function AdmissionStatusBadge({ status }: { status: string }) {
     return <span className={`px-2 py-0.5 rounded text-xs ${style}`}>{label}</span>;
 }
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AdmissionEditDialog({ student, onUpdate }: { student: Student, onUpdate: (id: string, results: any[]) => Promise<any> }) {
     const [open, setOpen] = useState(false);
@@ -307,6 +358,96 @@ function AdmissionEditDialog({ student, onUpdate }: { student: Student, onUpdate
                         <Plus className="h-4 w-4 mr-2" />
                         志望校を追加
                     </Button>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleSave}>保存</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ProfileEditDialog({ student, allInstructors, onUpdate }: { student: Student, allInstructors: { id: string, name: string | null }[], onUpdate: (id: string, data: any) => Promise<any> }) {
+    const [open, setOpen] = useState(false);
+    const [formData, setFormData] = useState({
+        schoolName: student.schoolName || "",
+        grade: student.grade || "",
+        researchTheme: student.researchTheme || "",
+        gpa: student.gpa?.toString() || "",
+        qualifications: student.qualifications || "",
+        canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
+        dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
+    });
+
+    const handleSave = async () => {
+        const payload = {
+            ...formData,
+            gpa: formData.gpa ? parseFloat(formData.gpa) : null,
+            canInternalUpgrade: formData.canInternalUpgrade === "true" ? true : formData.canInternalUpgrade === "false" ? false : null
+        };
+        await onUpdate(student.id, payload);
+        setOpen(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm">基本情報編集</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>基本情報の編集 - {student.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>所属高校</Label>
+                            <Input value={formData.schoolName} onChange={e => setFormData({ ...formData, schoolName: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>学年</Label>
+                            <Input value={formData.grade} onChange={e => setFormData({ ...formData, grade: e.target.value })} placeholder="例: 高2" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>研究テーマ</Label>
+                        <Input value={formData.researchTheme} onChange={e => setFormData({ ...formData, researchTheme: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>評定平均</Label>
+                        <Input type="number" step="0.1" value={formData.gpa} onChange={e => setFormData({ ...formData, gpa: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>内部進学の可否</Label>
+                        <Select value={formData.canInternalUpgrade} onValueChange={v => setFormData({ ...formData, canInternalUpgrade: v })}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="選択してください" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="true">可能</SelectItem>
+                                <SelectItem value="false">不可</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>資格・実績</Label>
+                        <Input value={formData.qualifications} onChange={e => setFormData({ ...formData, qualifications: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>専任講師</Label>
+                        <Select value={formData.dedicatedInstructorId} onValueChange={v => setFormData({ ...formData, dedicatedInstructorId: v })}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="担当なし" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="None">担当なし</SelectItem>
+                                {allInstructors.map(inst => (
+                                    <SelectItem key={inst.id} value={inst.id}>{inst.name || "名称未設定"}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button onClick={handleSave}>保存</Button>

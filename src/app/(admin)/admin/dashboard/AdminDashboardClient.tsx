@@ -34,6 +34,14 @@ interface User {
     admissionResults?: any[];
     archiveYear?: number | null;
     archivedAt?: Date | null;
+    // Profile Fields
+    schoolName?: string | null;
+    grade?: string | null;
+    researchTheme?: string | null;
+    gpa?: number | null;
+    qualifications?: string | null;
+    canInternalUpgrade?: boolean | null;
+    dedicatedInstructor?: { id: string; name: string | null } | null;
 }
 
 interface Instructor {
@@ -55,6 +63,15 @@ interface Student {
     name: string | null;
     email: string;
     studentBookings: Booking[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    admissionResults?: any[];
+    schoolName?: string | null;
+    grade?: string | null;
+    researchTheme?: string | null;
+    gpa?: number | null;
+    qualifications?: string | null;
+    canInternalUpgrade?: boolean | null;
+    dedicatedInstructor?: { id: string; name: string | null } | null;
 }
 
 interface Shift {
@@ -72,7 +89,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers } from "./actions";
+import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers, updateStudentProfile, updateAdmissionResults } from "./actions";
 import { logout } from "@/lib/actions";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
 
@@ -188,7 +205,13 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                 </TabsList>
 
                 <TabsContent value="reports" className="space-y-6">
-                    <CarteViewer students={students} />
+                    <CarteViewer
+                        students={students}
+                        allInstructors={allInstructors}
+                        editable={true}
+                        onUpdateProfile={updateStudentProfile}
+                        onUpdateAdmission={updateAdmissionResults}
+                    />
                 </TabsContent>
 
                 <TabsContent value="master-schedule" className="space-y-6">

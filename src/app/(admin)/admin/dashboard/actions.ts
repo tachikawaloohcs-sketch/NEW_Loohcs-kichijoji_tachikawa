@@ -17,7 +17,8 @@ export async function getUsers() {
                 select: { studentBookings: true, instructorShifts: true }
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            admissionResults: true
+            admissionResults: true,
+            dedicatedInstructor: { select: { id: true, name: true } }
         } as any
     });
 }
@@ -378,3 +379,76 @@ export async function updateGlobalSettings(key: string, value: string, descripti
 
 
 
+// 生徒プロフィール更新
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function updateStudentProfile(
+    studentId: string,
+    data: {
+        schoolName?: string;
+        grade?: string;
+        researchTheme?: string;
+        gpa?: number;
+        qualifications?: string;
+        canInternalUpgrade?: boolean;
+        dedicatedInstructorId?: string | null;
+    }
+) {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+    try {
+        await prisma.user.update({
+            where: { id: studentId },
+            data: {
+                schoolName: data.schoolName,
+                grade: data.grade,
+                researchTheme: data.researchTheme,
+                gpa: data.gpa,
+                qualifications: data.qualifications,
+                canInternalUpgrade: data.canInternalUpgrade,
+                dedicatedInstructorId: data.dedicatedInstructorId === "None" ? null : data.dedicatedInstructorId
+            }
+        });
+        revalidatePath("/admin/dashboard");
+        revalidatePath("/instructor/dashboard");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "更新に失敗しました" };
+    }
+}
+
+// 志望校・合否情報更新
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function updateAdmissionResults(studentId: string, results: any[]) {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+    try {
+        // Transaction to replace all results
+        await prisma.$transaction(async (tx) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (tx as any).admissionResult.deleteMany({ where: { studentId } });
+
+            if (results.length > 0) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await (tx as any).admissionResult.createMany({
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    data: results.map((r: any) => ({
+                        studentId,
+                        schoolName: r.schoolName,
+                        department: r.department,
+                        rank: r.rank,
+                        status: r.status
+                    }))
+                });
+            }
+        });
+
+        revalidatePath("/admin/dashboard");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "更新に失敗しました" };
+    }
+}
