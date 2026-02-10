@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
-import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport } from "./actions";
+import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport, forceBookStudent } from "./actions";
 
 type ShiftType = "individual" | "group" | "special" | "beginner" | "trial";
 
@@ -127,6 +127,11 @@ export default function InstructorDashboardClient({
     const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
     const [reportDefaults, setReportDefaults] = useState<Report | null>(null);
 
+    // Force Booking Dialog State
+    const [showForceBookDialog, setShowForceBookDialog] = useState(false);
+    const [forceBookShiftId, setForceBookShiftId] = useState<string | null>(null);
+    const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+
     // Shift Form State
     const [startTime, setStartTime] = useState("10:00");
     const [endTime, setEndTime] = useState("11:00");
@@ -180,16 +185,8 @@ export default function InstructorDashboardClient({
         return currentShifts.filter((s) => isSameDay(s.start, day));
     };
 
-    const formatDate = (d: Date) => {
-        const date = new Date(d);
-        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-        return format(jstDate, "yyyy/MM/dd HH:mm");
-    };
-    const formatTime = (d: Date) => {
-        const date = new Date(d);
-        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-        return format(jstDate, "HH:mm");
-    };
+    const formatDate = (d: Date) => format(d, "yyyy/MM/dd HH:mm");
+    const formatTime = (d: Date) => format(d, "HH:mm");
 
     const getLocationLabel = (loc?: string) => {
         switch (loc) {
@@ -387,7 +384,20 @@ export default function InstructorDashboardClient({
                                                                     {confirmedBooking ? (
                                                                         <span className="text-xs text-blue-600">予約あり: {confirmedBooking.student.name}</span>
                                                                     ) : (
-                                                                        <span className="text-xs text-muted-foreground">予約なし</span>
+                                                                        <div className="flex gap-2 items-center">
+                                                                            <span className="text-xs text-muted-foreground">予約なし</span>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-6 text-xs"
+                                                                                onClick={() => {
+                                                                                    setForceBookShiftId(shift.id);
+                                                                                    setShowForceBookDialog(true);
+                                                                                }}
+                                                                            >
+                                                                                生徒を予約
+                                                                            </Button>
+                                                                        </div>
                                                                     )}
 
                                                                     {/* Report Button / Status */}
@@ -776,6 +786,59 @@ export default function InstructorDashboardClient({
                             <Button type="submit" disabled={isPending}>提出する</Button>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Force Booking Dialog */}
+            <Dialog open={showForceBookDialog} onOpenChange={setShowForceBookDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>生徒を予約</DialogTitle>
+                        <DialogDescription>
+                            このシフトに予約する生徒を選択してください
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>生徒を選択</Label>
+                            <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="生徒を選択..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {initialStudents.map(student => (
+                                        <SelectItem key={student.id} value={student.id}>
+                                            {student.name || student.email}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => {
+                            setShowForceBookDialog(false);
+                            setSelectedStudentId("");
+                        }}>
+                            キャンセル
+                        </Button>
+                        <Button onClick={async () => {
+                            if (!forceBookShiftId || !selectedStudentId) {
+                                alert("生徒を選択してください");
+                                return;
+                            }
+                            const result = await forceBookStudent(forceBookShiftId, selectedStudentId);
+                            if (result.success) {
+                                setShowForceBookDialog(false);
+                                setSelectedStudentId("");
+                                window.location.reload();
+                            } else {
+                                alert(result.error || "予約に失敗しました");
+                            }
+                        }} disabled={isPending}>
+                            予約する
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 

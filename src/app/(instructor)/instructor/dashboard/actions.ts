@@ -600,3 +600,53 @@ export async function updateStudentProfile(
         return { error: "Failed to update student profile" };
     }
 }
+
+// Force book a student to a shift (instructor only)
+export async function forceBookStudent(shiftId: string, studentId: string) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {
+        return { error: "Unauthorized" };
+    }
+
+    try {
+        // Check if shift exists and belongs to instructor
+        const shift = await prisma.shift.findUnique({
+            where: { id: shiftId },
+            include: { bookings: true }
+        });
+
+        if (!shift || shift.instructorId !== session.user.id) {
+            return { error: "Shift not found or unauthorized" };
+        }
+
+        // Check if shift already has a confirmed booking (for INDIVIDUAL type)
+        if (shift.type === "INDIVIDUAL" && shift.bookings.some(b => b.status === "CONFIRMED")) {
+            return { error: "このシフトには既に予約があります" };
+        }
+
+        // Check if student exists
+        const student = await prisma.user.findUnique({
+            where: { id: studentId, role: "STUDENT" }
+        });
+
+        if (!student) {
+            return { error: "Student not found" };
+        }
+
+        // Create booking
+        await prisma.booking.create({
+            data: {
+                shiftId,
+                studentId,
+                status: "CONFIRMED",
+                meetingType: shift.location || "ONLINE"
+            }
+        });
+
+        revalidatePath("/instructor/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to force book student:", error);
+        return { error: "Failed to book student" };
+    }
+}
