@@ -68,15 +68,34 @@ export async function createBooking(shiftId: string, meetingType: string = "ONLI
         return { error: "予約期限切れです（授業開始24時間前まで予約可能）" };
     }
 
-    const existingBooking = await prisma.booking.findFirst({
-        where: {
-            shiftId: shiftId,
-            status: "CONFIRMED"
-        }
-    });
+    // Check booking availability based on shift type
+    if (shift.type === "INDIVIDUAL") {
+        // Individual shifts: only one booking allowed
+        const existingBooking = await prisma.booking.findFirst({
+            where: {
+                shiftId: shiftId,
+                status: "CONFIRMED"
+            }
+        });
 
-    if (existingBooking && shift.type === "INDIVIDUAL") {
-        return { error: "この枠は既に予約されています" };
+        if (existingBooking) {
+            return { error: "この枠は既に予約されています" };
+        }
+    } else if (shift.type === "GROUP" || shift.type === "SPECIAL_PACK") {
+        // Group shifts: check capacity if maxCapacity is set
+        if (shift.maxCapacity !== null) {
+            const confirmedCount = await prisma.booking.count({
+                where: {
+                    shiftId: shiftId,
+                    status: "CONFIRMED"
+                }
+            });
+
+            if (confirmedCount >= shift.maxCapacity) {
+                return { error: "この授業は定員に達しています" };
+            }
+        }
+        // If maxCapacity is null, unlimited bookings allowed
     }
 
     try {
