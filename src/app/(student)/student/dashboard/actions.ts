@@ -18,6 +18,7 @@ export async function getInstructors() {
 }
 
 export async function getDetailedShifts(instructorId: string) {
+    // Database stores times in UTC, so we can directly compare with current time
     const shifts = await prisma.shift.findMany({
         where: {
             instructorId,
