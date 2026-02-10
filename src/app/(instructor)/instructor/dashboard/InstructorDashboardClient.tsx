@@ -710,7 +710,7 @@ export default function InstructorDashboardClient({
             </Tabs>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>シフトを追加</DialogTitle>
                         <DialogDescription>
@@ -762,6 +762,19 @@ export default function InstructorDashboardClient({
                                     onChange={(e) => setClassNameInput(e.target.value)}
                                     placeholder="例: 中3英語特訓"
                                     className="col-span-3"
+                                />
+                            </div>
+                        )}
+                        {(shiftType === "group" || shiftType === "special") && (
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">最大定員</Label>
+                                <Input
+                                    type="number"
+                                    value={maxCapacity}
+                                    onChange={(e) => setMaxCapacity(e.target.value)}
+                                    placeholder="空欄=無制限"
+                                    className="col-span-3"
+                                    min="1"
                                 />
                             </div>
                         )}
