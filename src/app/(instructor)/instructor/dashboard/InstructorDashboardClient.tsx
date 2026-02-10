@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
-import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile } from "./actions";
+import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport } from "./actions";
 
 type ShiftType = "individual" | "group" | "special" | "beginner" | "trial";
 
@@ -132,6 +132,18 @@ export default function InstructorDashboardClient({
     const [shiftType, setShiftType] = useState<ShiftType>("individual");
     const [location, setLocation] = useState("ONLINE");
     const [classNameInput, setClassNameInput] = useState("");
+
+    // Auto-calculate end time based on start time and shift type
+    useEffect(() => {
+        const calculateEndTime = (start: string, type: ShiftType) => {
+            const [hours, minutes] = start.split(':').map(Number);
+            const duration = type === 'special' ? 2 : 1;
+            const endHours = (hours + duration) % 24;
+            return `${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        };
+
+        setEndTime(calculateEndTime(startTime, shiftType));
+    }, [startTime, shiftType]);
 
     const handleDateSelect = (selectedDate: Date | undefined) => {
         setDate(selectedDate);
@@ -629,6 +641,14 @@ export default function InstructorDashboardClient({
                         editable={true}
                         onUpdateAdmission={updateAdmissionResult}
                         onUpdateProfile={updateStudentProfile}
+                        onUpdateReport={async (reportId, data) => {
+                            const formData = new FormData();
+                            formData.append("content", data.content);
+                            formData.append("homework", data.homework || "");
+                            formData.append("feedback", data.feedback || "");
+                            formData.append("logUrl", data.logUrl || "");
+                            return await updateReport(reportId, formData);
+                        }}
                     />
                 </TabsContent>
 

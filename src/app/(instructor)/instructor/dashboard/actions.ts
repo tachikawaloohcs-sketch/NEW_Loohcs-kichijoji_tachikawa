@@ -101,6 +101,19 @@ export async function createShift(formData: FormData) {
     const endDateTime = new Date(`${dateStr}T${endTime}:00`);
 
     try {
+        // Check for overlapping shifts (double booking prevention)
+        const overlappingShifts = await prisma.shift.findMany({
+            where: {
+                instructorId: session.user.id,
+                start: { lt: endDateTime },
+                end: { gt: startDateTime }
+            }
+        });
+
+        if (overlappingShifts.length > 0) {
+            return { error: "この時間帯には既にシフトが登録されています" };
+        }
+
         const shift = await prisma.shift.create({
             data: {
                 instructorId: session.user.id,
@@ -145,19 +158,13 @@ export async function submitReport(bookingId: string, formData: FormData) {
         return { error: "授業開始前です。まだカルテは記入できません。" };
     }
 
-    const deadline = new Date(shiftStart);
-    deadline.setHours(23, 59, 59, 999);
-
-    // Get extension hours setting
-    const setting = await prisma.globalSettings.findUnique({
-        where: { key: "CARTE_DEADLINE_EXTENSION_HOURS" }
-    });
-    const extensionHours = parseInt(setting?.value || "0", 10);
-    deadline.setHours(deadline.getHours() + extensionHours);
+    // Check if submission is late
+    const shiftEnd = new Date(booking.shift.end);
+    const isLate = now > shiftEnd;
 
     let warning = null;
-    if (now > deadline) {
-        warning = "提出期限を過ぎています。遅延提出として記録されました。次回からは期限内に提出するようにしてください。";
+    if (isLate) {
+        warning = "遅れて提出します。以降このようなことが多発する場合は厳しく対処する可能性があります。";
     }
 
     try {
@@ -167,20 +174,58 @@ export async function submitReport(bookingId: string, formData: FormData) {
                 content,
                 logUrl,
                 homework,
-                feedback
+                feedback,
+                submittedLate: isLate,
+                updatedAt: new Date()
             },
             create: {
                 bookingId: bookingId,
                 content,
                 logUrl,
                 homework,
-                feedback
+                feedback,
+                submittedLate: isLate
             }
         });
         revalidatePath("/instructor/dashboard");
         return { success: true, warning };
     } catch {
         return { error: "Failed to submit report" };
+    }
+}
+
+export async function updateReport(reportId: string, formData: FormData) {
+    const session = await auth();
+    if (!session?.user || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) {
+        return { error: "Unauthorized" };
+    }
+
+    const content = formData.get("content") as string;
+    const logUrl = formData.get("logUrl") as string;
+    const homework = formData.get("homework") as string;
+    const feedback = formData.get("feedback") as string;
+
+    if (!content) {
+        return { error: "Content is required" };
+    }
+
+    try {
+        await prisma.report.update({
+            where: { id: reportId },
+            data: {
+                content,
+                logUrl: logUrl || null,
+                homework: homework || null,
+                feedback: feedback || null,
+                updatedAt: new Date()
+            }
+        });
+
+        revalidatePath("/instructor/dashboard");
+        return { success: true };
+    } catch (error) {
+        console.error("Failed to update report:", error);
+        return { error: "Failed to update report" };
     }
 }
 

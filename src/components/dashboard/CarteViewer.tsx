@@ -62,9 +62,11 @@ interface CarteViewerProps {
     onUpdateAdmission?: (studentId: string, results: any[]) => Promise<{ success?: boolean; error?: string }>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateProfile?: (studentId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onUpdateReport?: (reportId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
 }
 
-export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile }: CarteViewerProps) {
+export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile, onUpdateReport }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
     const formatDate = (d: Date) => format(new Date(d), "yyyy/MM/dd HH:mm");
@@ -162,13 +164,9 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                                             <CardTitle className="text-lg flex justify-between">
                                                 <span>{formatDate(booking.shift.start)}</span>
                                                 <div className="flex items-center gap-2">
-                                                    {(function () {
-                                                        const shiftEnd = new Date(booking.shift.start);
-                                                        shiftEnd.setHours(23, 59, 59, 999);
-                                                        const created = new Date(booking.report!.createdAt);
-                                                        const isLate = created > shiftEnd;
-                                                        return isLate ? <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">遅延提出</span> : null;
-                                                    })()}
+                                                    {booking.report.submittedLate && (
+                                                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">遅延提出</span>
+                                                    )}
                                                     {(function () {
                                                         const created = new Date(booking.report!.createdAt);
                                                         const updated = new Date(booking.report!.updatedAt);
