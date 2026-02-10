@@ -578,15 +578,15 @@ export default function InstructorDashboardClient({
                                     </div>
                                     <div className="space-y-2">
                                         <Label>該当ログURL</Label>
-                                        <Input name="logUrl" placeholder="https://..." />
+                                        <Input name="logUrl" required placeholder="https://..." defaultValue={reportDefaults?.logUrl || ""} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>宿題</Label>
-                                        <Input name="homework" placeholder="志望理由書（2000字以上）" />
+                                        <Input name="homework" required placeholder="P.24-25, 単語テスト" defaultValue={reportDefaults?.homework || ""} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>講師への連絡事項</Label>
-                                        <Textarea name="feedback" placeholder="引き継ぎ事項など" />
+                                        <Textarea name="feedback" required placeholder="次回までに復習しておくこと..." defaultValue={reportDefaults?.feedback || ""} />
                                     </div>
                                 </div>
                                 <DialogFooter>
