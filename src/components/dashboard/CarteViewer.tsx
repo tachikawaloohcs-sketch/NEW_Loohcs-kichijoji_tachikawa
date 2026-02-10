@@ -17,6 +17,7 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
+    submittedLate: boolean;
     createdAt: Date | string;
     updatedAt: Date | string;
 }
@@ -69,7 +70,12 @@ interface CarteViewerProps {
 export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile, onUpdateReport }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-    const formatDate = (d: Date) => format(new Date(d), "yyyy/MM/dd HH:mm");
+    const formatDate = (d: Date) => {
+        const date = new Date(d);
+        // Convert to JST (UTC+9)
+        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+        return format(jstDate, "yyyy/MM/dd HH:mm");
+    };
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -161,7 +167,7 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                                 booking.report && (
                                     <Card key={booking.id}>
                                         <CardHeader>
-                                            <CardTitle className="text-lg flex justify-between">
+                                            <CardTitle className="text-lg flex justify-between items-center">
                                                 <span>{formatDate(booking.shift.start)}</span>
                                                 <div className="flex items-center gap-2">
                                                     {booking.report.submittedLate && (
@@ -176,6 +182,12 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                                                         return null;
                                                     })()}
                                                     <span className="text-base font-normal text-muted-foreground">講師: {booking.shift.instructor.name}</span>
+                                                    {editable && onUpdateReport && (
+                                                        <ReportEditDialog
+                                                            report={booking.report}
+                                                            onUpdate={onUpdateReport}
+                                                        />
+                                                    )}
                                                 </div>
                                             </CardTitle>
                                         </CardHeader>
@@ -361,6 +373,87 @@ function ProfileInfoCard({
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+// Report Edit Dialog
+function ReportEditDialog({ report, onUpdate }: {
+    report: Report;
+    onUpdate: (reportId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
+}) {
+    const [open, setOpen] = useState(false);
+    const [formData, setFormData] = useState({
+        content: report.content,
+        homework: report.homework || "",
+        feedback: report.feedback || "",
+        logUrl: report.logUrl || ""
+    });
+
+    const handleSave = async () => {
+        await onUpdate(report.id, formData);
+        setOpen(false);
+    };
+
+    const handleCancel = () => {
+        setFormData({
+            content: report.content,
+            homework: report.homework || "",
+            feedback: report.feedback || "",
+            logUrl: report.logUrl || ""
+        });
+        setOpen(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm">編集</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>カルテ編集</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div>
+                        <Label>実施内容・所感</Label>
+                        <textarea
+                            className="w-full min-h-[120px] p-2 border rounded-md"
+                            value={formData.content}
+                            onChange={e => setFormData({ ...formData, content: e.target.value })}
+                            placeholder="授業の内容や生徒の様子を記入してください"
+                        />
+                    </div>
+                    <div>
+                        <Label>宿題</Label>
+                        <Input
+                            value={formData.homework}
+                            onChange={e => setFormData({ ...formData, homework: e.target.value })}
+                            placeholder="宿題の内容"
+                        />
+                    </div>
+                    <div>
+                        <Label>講師への連絡事項</Label>
+                        <Input
+                            value={formData.feedback}
+                            onChange={e => setFormData({ ...formData, feedback: e.target.value })}
+                            placeholder="次回の講師への連絡事項"
+                        />
+                    </div>
+                    <div>
+                        <Label>ログURL</Label>
+                        <Input
+                            value={formData.logUrl}
+                            onChange={e => setFormData({ ...formData, logUrl: e.target.value })}
+                            placeholder="https://docs.google.com/..."
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={handleCancel}>キャンセル</Button>
+                    <Button onClick={handleSave}>保存</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
