@@ -98,6 +98,8 @@ export async function createShift(formData: FormData) {
     const endTime = formData.get("endTime") as string;
     const type = formData.get("type") as string;
     const className = formData.get("className") as string;
+    const maxCapacityStr = formData.get("maxCapacity") as string;
+    const maxCapacity = maxCapacityStr ? parseInt(maxCapacityStr, 10) : null;
 
     if (!dateStr || !startTime || !endTime || !type) {
         return { error: "Missing fields" };
@@ -137,6 +139,7 @@ export async function createShift(formData: FormData) {
                 type: type.toUpperCase(),
                 className: className || null,
                 location: formData.get("location") as string || "ONLINE",
+                maxCapacity: maxCapacity,
                 isPublished: true,
             },
         });

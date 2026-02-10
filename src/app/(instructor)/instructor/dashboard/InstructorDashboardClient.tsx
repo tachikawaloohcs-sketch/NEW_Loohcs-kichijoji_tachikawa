@@ -138,6 +138,8 @@ export default function InstructorDashboardClient({
     const [shiftType, setShiftType] = useState<ShiftType>("individual");
     const [location, setLocation] = useState("ONLINE");
     const [classNameInput, setClassNameInput] = useState("");
+    const [maxCapacity, setMaxCapacity] = useState<string>(""); // Empty = unlimited
+    const [additionalInstructors, setAdditionalInstructors] = useState<string[]>([]); // Instructor IDs
 
     // Auto-calculate end time based on start time and shift type
     useEffect(() => {
@@ -167,6 +169,7 @@ export default function InstructorDashboardClient({
         formData.append("type", shiftType);
         formData.append("location", location);
         if (classNameInput) formData.append("className", classNameInput);
+        if (maxCapacity) formData.append("maxCapacity", maxCapacity);
 
         startTransition(async () => {
             const result = await createShift(formData);
@@ -554,6 +557,19 @@ export default function InstructorDashboardClient({
                                             onChange={(e) => setClassNameInput(e.target.value)}
                                             placeholder="例: 中3英語特訓"
                                             className="col-span-3"
+                                        />
+                                    </div>
+                                )}
+                                {(shiftType === "group" || shiftType === "special") && (
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                        <Label className="text-right">最大定員</Label>
+                                        <Input
+                                            type="number"
+                                            value={maxCapacity}
+                                            onChange={(e) => setMaxCapacity(e.target.value)}
+                                            placeholder="空欄=無制限"
+                                            className="col-span-3"
+                                            min="1"
                                         />
                                     </div>
                                 )}
