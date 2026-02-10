@@ -75,7 +75,13 @@ export async function getStudentsForInstructor() {
                 orderBy: { shift: { start: 'desc' } }
             },
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            admissionResults: true
+            admissionResults: true,
+            dedicatedInstructor: {
+                select: {
+                    id: true,
+                    name: true
+                }
+            }
         } as any,
         orderBy: { name: 'asc' }
     });
