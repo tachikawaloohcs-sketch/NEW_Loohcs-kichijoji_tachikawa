@@ -70,12 +70,7 @@ interface CarteViewerProps {
 export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile, onUpdateReport }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-    const formatDate = (d: Date) => {
-        const date = new Date(d);
-        // Convert to JST (UTC+9)
-        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-        return format(jstDate, "yyyy/MM/dd HH:mm");
-    };
+    const formatDate = (d: Date) => format(d, "yyyy/MM/dd HH:mm");
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
