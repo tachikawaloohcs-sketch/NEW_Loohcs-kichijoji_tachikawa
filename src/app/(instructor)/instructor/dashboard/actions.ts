@@ -185,6 +185,73 @@ export async function createShift(formData: FormData) {
     }
 }
 
+// Add instructor to existing shift (no time restrictions)
+export async function addInstructorToShift(shiftId: string, instructorId: string) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {
+        return { error: "Unauthorized" };
+    }
+
+    try {
+        // Check if shift exists
+        const shift = await prisma.shift.findUnique({
+            where: { id: shiftId }
+        });
+
+        if (!shift) {
+            return { error: "シフトが見つかりません" };
+        }
+
+        // Check if instructor is already assigned
+        const existingAssignment = await prisma.shiftInstructor.findFirst({
+            where: {
+                shiftId: shiftId,
+                instructorId: instructorId
+            }
+        });
+
+        if (existingAssignment) {
+            return { error: "この講師は既に割り当てられています" };
+        }
+
+        // Add instructor to shift
+        await prisma.shiftInstructor.create({
+            data: {
+                shiftId: shiftId,
+                instructorId: instructorId
+            }
+        });
+
+        revalidatePath("/instructor/dashboard");
+        return { success: true };
+    } catch {
+        return { error: "Database error" };
+    }
+}
+
+// Get instructors for a shift
+export async function getShiftInstructors(shiftId: string) {
+    try {
+        const shiftInstructors = await prisma.shiftInstructor.findMany({
+            where: { shiftId },
+            include: {
+                instructor: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true
+                    }
+                }
+            }
+        });
+
+        return shiftInstructors.map(si => si.instructor);
+    } catch {
+        return [];
+    }
+}
+
+
 export async function submitReport(bookingId: string, formData: FormData) {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {

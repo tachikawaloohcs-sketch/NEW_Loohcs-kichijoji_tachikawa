@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
-import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport, forceBookStudent } from "./actions";
+import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport, forceBookStudent, addInstructorToShift } from "./actions";
 
 type ShiftType = "individual" | "group" | "special" | "beginner" | "trial";
 
@@ -142,6 +142,11 @@ export default function InstructorDashboardClient({
     const [classNameInput, setClassNameInput] = useState("");
     const [maxCapacity, setMaxCapacity] = useState<string>(""); // Empty = unlimited
     const [additionalInstructors, setAdditionalInstructors] = useState<string[]>([]); // Instructor IDs
+
+    // Instructor assignment dialog
+    const [isAddInstructorDialogOpen, setIsAddInstructorDialogOpen] = useState(false);
+    const [selectedShiftForInstructor, setSelectedShiftForInstructor] = useState<string | null>(null);
+    const [selectedInstructorToAdd, setSelectedInstructorToAdd] = useState<string>("");
 
     // Auto-calculate end time based on start time and shift type
     useEffect(() => {
@@ -278,6 +283,25 @@ export default function InstructorDashboardClient({
                 setRequests(prev => prev.filter(r => r.id !== requestId));
             } else {
                 alert(res.error);
+            }
+        });
+    };
+
+    const handleAddInstructorToShift = async () => {
+        if (!selectedShiftForInstructor || !selectedInstructorToAdd) {
+            alert("講師を選択してください");
+            return;
+        }
+
+        startTransition(async () => {
+            const res = await addInstructorToShift(selectedShiftForInstructor, selectedInstructorToAdd);
+            if (res.success) {
+                alert("講師を追加しました");
+                setIsAddInstructorDialogOpen(false);
+                setSelectedInstructorToAdd("");
+                window.location.reload();
+            } else {
+                alert(res.error || "Error adding instructor");
             }
         });
     };
@@ -447,6 +471,22 @@ export default function InstructorDashboardClient({
                                                                                 disabled={isPending}
                                                                             >
                                                                                 削除
+                                                                            </Button>
+                                                                        )}
+
+                                                                        {/* Add Instructor Button - Always visible for GROUP/SPECIAL shifts */}
+                                                                        {(shift.type === "GROUP" || shift.type === "SPECIAL_PACK") && (
+                                                                            <Button
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                className="h-6 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                                                                onClick={() => {
+                                                                                    setSelectedShiftForInstructor(shift.id);
+                                                                                    setIsAddInstructorDialogOpen(true);
+                                                                                }}
+                                                                                disabled={isPending}
+                                                                            >
+                                                                                講師を追加
                                                                             </Button>
                                                                         )}
                                                                     </div>
@@ -909,6 +949,40 @@ export default function InstructorDashboardClient({
                 </DialogContent>
             </Dialog>
 
+            {/* Instructor Assignment Dialog */}
+            <Dialog open={isAddInstructorDialogOpen} onOpenChange={setIsAddInstructorDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>講師を追加</DialogTitle>
+                        <DialogDescription>
+                            このシフトに講師を追加します（時間制限なし）
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label className="text-right">講師</Label>
+                            <Select value={selectedInstructorToAdd} onValueChange={setSelectedInstructorToAdd}>
+                                <SelectTrigger className="col-span-3">
+                                    <SelectValue placeholder="講師を選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {instructors.map((instructor) => (
+                                        <SelectItem key={instructor.id} value={instructor.id}>
+                                            {instructor.name || instructor.email}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddInstructorDialogOpen(false)}>キャンセル</Button>
+                        <Button onClick={handleAddInstructorToShift} disabled={isPending}>追加する</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
+
     );
 }
