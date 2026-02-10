@@ -806,7 +806,7 @@ export default function InstructorDashboardClient({
                                     <SelectValue placeholder="生徒を選択..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {initialStudents.map(student => (
+                                    {students.map((student: Student) => (
                                         <SelectItem key={student.id} value={student.id}>
                                             {student.name || student.email}
                                         </SelectItem>
