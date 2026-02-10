@@ -101,7 +101,7 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                                 <div>
                                     <div className="font-semibold">{student.name}</div>
                                     <div className="text-xs text-muted-foreground">{student.email}</div>
-                                    <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentBookings.length}</div>
+                                    <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentBookings.length - 1}</div>
                                 </div>
                             </div>
                         ))
