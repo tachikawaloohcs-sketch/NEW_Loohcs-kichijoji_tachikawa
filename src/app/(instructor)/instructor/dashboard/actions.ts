@@ -97,14 +97,17 @@ export async function createShift(formData: FormData) {
         return { error: "Missing fields" };
     }
 
-    // Convert JST input to UTC for database storage
-    // User inputs time in JST, but we need to store in UTC
-    const startDateTime = new Date(`${dateStr}T${startTime}:00`);
-    const endDateTime = new Date(`${dateStr}T${endTime}:00`);
+    // Parse the date and time components
+    // User inputs time in JST, but Date constructor interprets based on server timezone
+    // We need to manually construct UTC time from JST input
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [startHour, startMinute] = startTime.split(':').map(Number);
+    const [endHour, endMinute] = endTime.split(':').map(Number);
 
-    // Subtract 9 hours to convert JST to UTC
-    const startDateTimeUTC = new Date(startDateTime.getTime() - (9 * 60 * 60 * 1000));
-    const endDateTimeUTC = new Date(endDateTime.getTime() - (9 * 60 * 60 * 1000));
+    // Create UTC date by treating input as JST and converting to UTC
+    // JST is UTC+9, so we subtract 9 hours
+    const startDateTimeUTC = new Date(Date.UTC(year, month - 1, day, startHour - 9, startMinute));
+    const endDateTimeUTC = new Date(Date.UTC(year, month - 1, day, endHour - 9, endMinute));
 
     try {
         // Check for overlapping shifts (double booking prevention)
