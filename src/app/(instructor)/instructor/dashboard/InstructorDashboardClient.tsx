@@ -509,9 +509,9 @@ export default function InstructorDashboardClient({
                                 <div className="grid grid-cols-4 items-center gap-4">
                                     <Label className="text-right">時間</Label>
                                     <div className="col-span-3 flex gap-2 items-center">
-                                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-24" />
+                                        <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
                                         <span>~</span>
-                                        <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-24" />
+                                        <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-4 items-center gap-4">
@@ -701,9 +701,9 @@ export default function InstructorDashboardClient({
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label className="text-right">時間</Label>
                             <div className="col-span-3 flex gap-2 items-center">
-                                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-24" />
+                                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
                                 <span>~</span>
-                                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-24" />
+                                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
                             </div>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
