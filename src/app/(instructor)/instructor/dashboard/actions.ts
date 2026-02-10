@@ -558,6 +558,7 @@ export async function updateStudentProfile(
 
         // Handle dedicated instructor by name
         if (data.dedicatedInstructorName && data.dedicatedInstructorName.trim() !== "") {
+            console.log("Looking for instructor with name:", data.dedicatedInstructorName.trim());
             // Find instructor by name
             const instructor = await prisma.user.findFirst({
                 where: {
@@ -566,10 +567,12 @@ export async function updateStudentProfile(
                 }
             });
 
+            console.log("Found instructor:", instructor);
             if (instructor) {
                 updateData.dedicatedInstructorId = instructor.id;
             } else {
                 // If instructor not found, set to null
+                console.log("Instructor not found, setting to null");
                 updateData.dedicatedInstructorId = null;
             }
         } else {

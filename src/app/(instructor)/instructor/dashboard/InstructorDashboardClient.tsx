@@ -57,6 +57,7 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
+    submittedLate: boolean;
     createdAt: Date | string;
     updatedAt: Date | string;
 }
@@ -179,8 +180,16 @@ export default function InstructorDashboardClient({
         return currentShifts.filter((s) => isSameDay(s.start, day));
     };
 
-    const formatDate = (d: Date) => format(d, "yyyy/MM/dd HH:mm");
-    const formatTime = (d: Date) => format(d, "HH:mm");
+    const formatDate = (d: Date) => {
+        const date = new Date(d);
+        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+        return format(jstDate, "yyyy/MM/dd HH:mm");
+    };
+    const formatTime = (d: Date) => {
+        const date = new Date(d);
+        const jstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+        return format(jstDate, "HH:mm");
+    };
 
     const getLocationLabel = (loc?: string) => {
         switch (loc) {
