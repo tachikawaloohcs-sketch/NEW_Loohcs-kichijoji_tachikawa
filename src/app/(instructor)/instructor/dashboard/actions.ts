@@ -97,16 +97,22 @@ export async function createShift(formData: FormData) {
         return { error: "Missing fields" };
     }
 
+    // Convert JST input to UTC for database storage
+    // User inputs time in JST, but we need to store in UTC
     const startDateTime = new Date(`${dateStr}T${startTime}:00`);
     const endDateTime = new Date(`${dateStr}T${endTime}:00`);
+
+    // Subtract 9 hours to convert JST to UTC
+    const startDateTimeUTC = new Date(startDateTime.getTime() - (9 * 60 * 60 * 1000));
+    const endDateTimeUTC = new Date(endDateTime.getTime() - (9 * 60 * 60 * 1000));
 
     try {
         // Check for overlapping shifts (double booking prevention)
         const overlappingShifts = await prisma.shift.findMany({
             where: {
                 instructorId: session.user.id,
-                start: { lt: endDateTime },
-                end: { gt: startDateTime }
+                start: { lt: endDateTimeUTC },
+                end: { gt: startDateTimeUTC }
             }
         });
 
@@ -117,8 +123,8 @@ export async function createShift(formData: FormData) {
         const shift = await prisma.shift.create({
             data: {
                 instructorId: session.user.id,
-                start: startDateTime,
-                end: endDateTime,
+                start: startDateTimeUTC,
+                end: endDateTimeUTC,
                 type: type.toUpperCase(),
                 className: className || null,
                 location: formData.get("location") as string || "ONLINE",
