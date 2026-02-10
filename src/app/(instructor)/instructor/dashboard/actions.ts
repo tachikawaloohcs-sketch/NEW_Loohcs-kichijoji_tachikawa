@@ -9,6 +9,25 @@ import { ja } from "date-fns/locale";
 // Mock Email Function
 import { sendEmail } from "@/lib/mail";
 
+// Get all instructors for multi-select UI
+export async function getAllInstructors() {
+    return await prisma.user.findMany({
+        where: {
+            role: "INSTRUCTOR",
+            isActive: true
+        },
+        select: {
+            id: true,
+            name: true,
+            email: true
+        },
+        orderBy: {
+            name: 'asc'
+        }
+    });
+}
+
+
 export async function getInstructorShifts() {
     const session = await auth();
     console.log("DEBUG: getInstructorShifts Session:", session?.user?.email, session?.user?.role, session?.user?.id);
@@ -142,6 +161,21 @@ export async function createShift(formData: FormData) {
                 maxCapacity: maxCapacity,
                 isPublished: true,
             },
+        });
+
+        // Create ShiftInstructor records for main instructor and additional instructors
+        const additionalInstructorsStr = formData.get("additionalInstructors") as string;
+        const additionalInstructorIds: string[] = additionalInstructorsStr ? JSON.parse(additionalInstructorsStr) : [];
+
+        // Always add main instructor
+        const instructorIds = [session.user.id, ...additionalInstructorIds];
+
+        await prisma.shiftInstructor.createMany({
+            data: instructorIds.map(instructorId => ({
+                shiftId: shift.id,
+                instructorId: instructorId
+            })),
+            skipDuplicates: true
         });
 
         revalidatePath("/instructor/dashboard");

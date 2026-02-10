@@ -1,4 +1,4 @@
-import { getInstructorShifts, getInstructorRequests, getStudentsForInstructor, getGlobalSettings, getLicensedArchivedStudents } from "./actions";
+import { getInstructorShifts, getInstructorRequests, getStudentsForInstructor, getGlobalSettings, getLicensedArchivedStudents, getAllInstructors } from "./actions";
 import InstructorDashboardClient from "./InstructorDashboardClient";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/lib/actions";
@@ -14,12 +14,13 @@ export default async function InstructorDashboardPage() {
         const session = await auth();
         console.log("Session User:", session?.user?.email);
 
-        const [shifts, requests, students, archivedStudents, deadlineSetting] = await Promise.all([
+        const [shifts, requests, students, archivedStudents, deadlineSetting, instructors] = await Promise.all([
             getInstructorShifts(),
             getInstructorRequests(),
             getStudentsForInstructor(),
             getLicensedArchivedStudents(),
-            getGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS")
+            getGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS"),
+            getAllInstructors()
         ]);
         const extensionHours = parseInt(deadlineSetting.value || "0", 10);
 
@@ -53,6 +54,7 @@ export default async function InstructorDashboardPage() {
                     archivedStudents={archivedStudents as any}
                     deadlineExtensionHours={extensionHours}
                     currentUser={safeUser}
+                    instructors={instructors}
                 />
             </div>
         );

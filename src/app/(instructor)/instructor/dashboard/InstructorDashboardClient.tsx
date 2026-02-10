@@ -86,14 +86,16 @@ export default function InstructorDashboardClient({
     students,
     archivedStudents = [],
     deadlineExtensionHours = 0,
-    currentUser
+    currentUser,
+    instructors = []
 }: {
     initialShifts: Shift[],
     initialRequests: Request[],
     students: Student[],
     archivedStudents?: Student[],
     deadlineExtensionHours?: number,
-    currentUser?: any
+    currentUser?: any,
+    instructors?: { id: string; name: string | null; email: string }[]
 }) {
     const [date, setDate] = useState<Date | undefined>(new Date());
 
@@ -170,6 +172,7 @@ export default function InstructorDashboardClient({
         formData.append("location", location);
         if (classNameInput) formData.append("className", classNameInput);
         if (maxCapacity) formData.append("maxCapacity", maxCapacity);
+        if (additionalInstructors.length > 0) formData.append("additionalInstructors", JSON.stringify(additionalInstructors));
 
         startTransition(async () => {
             const result = await createShift(formData);
@@ -776,6 +779,37 @@ export default function InstructorDashboardClient({
                                     className="col-span-3"
                                     min="1"
                                 />
+                            </div>
+                        )}
+                        {(shiftType === "group" || shiftType === "special") && (
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label className="text-right">追加講師</Label>
+                                <div className="col-span-3 space-y-2">
+                                    <p className="text-sm text-muted-foreground">集団授業の共同担当講師を選択（複数可）</p>
+                                    {instructors.filter(i => i.id !== currentUser?.id).map((instructor) => (
+                                        <div key={instructor.id} className="flex items-center space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                id={`instructor-${instructor.id}`}
+                                                checked={additionalInstructors.includes(instructor.id)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setAdditionalInstructors([...additionalInstructors, instructor.id]);
+                                                    } else {
+                                                        setAdditionalInstructors(additionalInstructors.filter(id => id !== instructor.id));
+                                                    }
+                                                }}
+                                                className="rounded border-gray-300"
+                                            />
+                                            <label htmlFor={`instructor-${instructor.id}`} className="text-sm cursor-pointer">
+                                                {instructor.name || instructor.email}
+                                            </label>
+                                        </div>
+                                    ))}
+                                    {instructors.filter(i => i.id !== currentUser?.id).length === 0 && (
+                                        <p className="text-sm text-muted-foreground">他の講師が登録されていません</p>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </div>
