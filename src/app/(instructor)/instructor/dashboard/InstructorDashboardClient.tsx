@@ -42,6 +42,7 @@ interface Shift {
     location?: string; // Add location to interface
     bookings: Booking[];
     shiftInstructors?: { instructor: { name: string | null } }[];
+    maxCapacity?: number | null;
 }
 
 interface Request {
@@ -414,62 +415,67 @@ export default function InstructorDashboardClient({
                                                             </div>
                                                         )}
 
-                                                        {/* Bookings List */}
+                                                        {/* Bookings List & Add Student Button */}
                                                         {(() => {
                                                             const confirmedBookings = shift.bookings.filter(b => b.status === 'CONFIRMED' || b.status === "confirmed");
+                                                            const isGroupOrSpecial = shift.type === "GROUP" || shift.type === "SPECIAL" || shift.type === "SPECIAL_PACK";
+                                                            const currentBookingsCount = confirmedBookings.length;
+                                                            const maxCap = shift.maxCapacity;
+                                                            const hasCapacity = isGroupOrSpecial ? (!maxCap || currentBookingsCount < maxCap) : currentBookingsCount === 0;
 
-                                                            if (confirmedBookings.length > 0) {
-                                                                return (
-                                                                    <div className="flex flex-col gap-2 w-full">
-                                                                        {confirmedBookings.map(booking => (
-                                                                            <div key={booking.id} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border">
-                                                                                <span className="text-xs font-medium">{booking.student.name}</span>
+                                                            return (
+                                                                <div className="flex flex-col gap-2 w-full">
+                                                                    {confirmedBookings.length > 0 && (
+                                                                        <div className="flex flex-col gap-2 w-full">
+                                                                            {confirmedBookings.map(booking => (
+                                                                                <div key={booking.id} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border">
+                                                                                    <span className="text-xs font-medium">{booking.student.name}</span>
+                                                                                    {(() => {
+                                                                                        const hasReport = !!booking.report;
+                                                                                        const isStarted = new Date(shift.start) < new Date();
+                                                                                        if (hasReport) {
+                                                                                            return (
+                                                                                                <div className="flex gap-2 items-center">
+                                                                                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1 py-0 h-5">提出済</Badge>
+                                                                                                    <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => openReportDialog(booking.id, booking.report)}>編集</Button>
+                                                                                                </div>
+                                                                                            );
+                                                                                        } else if (isStarted) {
+                                                                                            return <Button size="sm" onClick={() => openReportDialog(booking.id)} className="h-6 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">カルテ</Button>;
+                                                                                        }
+                                                                                        return <span className="text-[10px] text-muted-foreground">未実施</span>;
+                                                                                    })()}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
 
-                                                                                {/* Report Button */}
-                                                                                {(() => {
-                                                                                    const hasReport = !!booking.report;
-                                                                                    const isStarted = new Date(shift.start) < new Date();
-
-                                                                                    if (hasReport) {
-                                                                                        return (
-                                                                                            <div className="flex gap-2 items-center">
-                                                                                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1 py-0 h-5">提出済</Badge>
-                                                                                                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => openReportDialog(booking.id, booking.report)}>編集</Button>
-                                                                                            </div>
-                                                                                        );
-                                                                                    } else if (isStarted) {
-                                                                                        return <Button size="sm" onClick={() => openReportDialog(booking.id)} className="h-6 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">カルテ</Button>;
-                                                                                    }
-                                                                                    return <span className="text-[10px] text-muted-foreground">未実施</span>;
-                                                                                })()}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                );
-                                                            } else {
-                                                                return (
-                                                                    <div className="flex justify-between items-center">
-                                                                        <span className="text-xs text-muted-foreground">予約なし</span>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="h-6 text-xs"
-                                                                            onClick={() => {
-                                                                                setForceBookShiftId(shift.id);
-                                                                                setShowForceBookDialog(true);
-                                                                            }}
-                                                                        >
-                                                                            生徒を予約
-                                                                        </Button>
-                                                                    </div>
-                                                                );
-                                                            }
+                                                                    {hasCapacity && (
+                                                                        <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-2 rounded border border-dashed text-muted-foreground">
+                                                                            <span className="text-xs">
+                                                                                {isGroupOrSpecial ? (maxCap ? `空き枠あり (${currentBookingsCount}/${maxCap})` : "空き枠あり") : "予約なし"}
+                                                                            </span>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-6 text-xs"
+                                                                                onClick={() => {
+                                                                                    setForceBookShiftId(shift.id);
+                                                                                    setShowForceBookDialog(true);
+                                                                                }}
+                                                                            >
+                                                                                生徒を予約
+                                                                            </Button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
                                                         })()}
 
                                                         {/* Shift Actions (Delete / Add Instructor) */}
                                                         <div className="flex justify-end gap-2 border-t pt-2 mt-1">
                                                             {/* Add Instructor Button */}
-                                                            {(shift.type === "GROUP" || shift.type === "SPECIAL_PACK") && (
+                                                            {(shift.type === "GROUP" || shift.type === "SPECIAL_PACK" || shift.type === "SPECIAL") && (
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
