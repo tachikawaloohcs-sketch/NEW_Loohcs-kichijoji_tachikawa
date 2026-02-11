@@ -39,13 +39,33 @@ export async function getInstructorShifts() {
 
     const shifts = await prisma.shift.findMany({
         where: {
-            instructorId: session.user.id,
+            OR: [
+                { instructorId: session.user.id },
+                {
+                    shiftInstructors: {
+                        some: {
+                            instructorId: session.user.id
+                        }
+                    }
+                }
+            ]
         },
         include: {
             bookings: {
                 include: {
                     student: { select: { name: true } },
                     report: true
+                }
+            },
+            shiftInstructors: {
+                include: {
+                    instructor: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true
+                        }
+                    }
                 }
             }
         },

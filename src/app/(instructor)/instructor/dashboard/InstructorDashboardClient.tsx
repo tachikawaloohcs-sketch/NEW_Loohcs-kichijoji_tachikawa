@@ -41,6 +41,7 @@ interface Shift {
     className?: string | null;
     location?: string; // Add location to interface
     bookings: Booking[];
+    shiftInstructors?: { instructor: { name: string | null } }[];
 }
 
 interface Request {
@@ -404,95 +405,110 @@ export default function InstructorDashboardClient({
                                                         </div>
                                                         <span className="text-xs text-muted-foreground">{getLocationLabel(shift.location)}</span>
                                                     </div>
-                                                    <div className="flex justify-between items-center mt-2">
+                                                    <div className="flex flex-col gap-2 mt-2">
+                                                        {/* Assigned Instructors */}
+                                                        {shift.shiftInstructors && shift.shiftInstructors.length > 0 && (
+                                                            <div className="text-xs text-muted-foreground">
+                                                                <span className="font-semibold mr-1">担当:</span>
+                                                                {shift.shiftInstructors.map(si => si.instructor.name || "未設定").join(", ")}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Bookings List */}
                                                         {(() => {
-                                                            // Find confirmed booking
-                                                            const confirmedBooking = shift.bookings.find(b => b.status === 'CONFIRMED' || b.status === 'confirmed');
+                                                            const confirmedBookings = shift.bookings.filter(b => b.status === 'CONFIRMED' || b.status === "confirmed");
 
-                                                            return (
-                                                                <>
-                                                                    {confirmedBooking ? (
-                                                                        <span className="text-xs text-blue-600">予約あり: {confirmedBooking.student.name}</span>
-                                                                    ) : (
-                                                                        <div className="flex gap-2 items-center">
-                                                                            <span className="text-xs text-muted-foreground">予約なし</span>
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline"
-                                                                                className="h-6 text-xs"
-                                                                                onClick={() => {
-                                                                                    setForceBookShiftId(shift.id);
-                                                                                    setShowForceBookDialog(true);
-                                                                                }}
-                                                                            >
-                                                                                生徒を予約
-                                                                            </Button>
-                                                                        </div>
-                                                                    )}
+                                                            if (confirmedBookings.length > 0) {
+                                                                return (
+                                                                    <div className="flex flex-col gap-2 w-full">
+                                                                        {confirmedBookings.map(booking => (
+                                                                            <div key={booking.id} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2 rounded border">
+                                                                                <span className="text-xs font-medium">{booking.student.name}</span>
 
-                                                                    {/* Report Button / Status */}
-                                                                    <div className="flex gap-2 items-center">
-                                                                        {confirmedBooking && (() => {
-                                                                            const hasReport = !!confirmedBooking.report;
-                                                                            const isStarted = new Date(shift.start) < new Date();
+                                                                                {/* Report Button */}
+                                                                                {(() => {
+                                                                                    const hasReport = !!booking.report;
+                                                                                    const isStarted = new Date(shift.start) < new Date();
 
-                                                                            if (hasReport) {
-                                                                                return (
-                                                                                    <div className="flex gap-2 items-center">
-                                                                                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">提出済み</Badge>
-                                                                                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openReportDialog(confirmedBooking.id, confirmedBooking.report)}>編集</Button>
-                                                                                    </div>
-                                                                                );
-                                                                            } else if (isStarted) {
-                                                                                return <Button size="sm" onClick={() => openReportDialog(confirmedBooking.id)} className="h-7 text-xs bg-orange-600 hover:bg-orange-700 text-white">カルテを書く</Button>;
-                                                                            }
-                                                                            return null;
-                                                                        })()}
-
-                                                                        {/* Delete Button Logic - Allow if > 24h even if booked */}
-                                                                        {new Date(shift.start).getTime() - new Date().getTime() > 24 * 60 * 60 * 1000 && (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                                onClick={() => {
-                                                                                    const hasBooking = shift.bookings.some(b => b.status === 'CONFIRMED');
-                                                                                    const message = hasBooking
-                                                                                        ? "このシフトには予約が入っています。\n削除すると予約もキャンセルされます。\n本当に削除しますか？"
-                                                                                        : "このシフトを削除しますか？";
-
-                                                                                    if (confirm(message)) {
-                                                                                        startTransition(async () => {
-                                                                                            const res = await deleteShift(shift.id);
-                                                                                            if (!res.success) alert(res.error);
-                                                                                        });
+                                                                                    if (hasReport) {
+                                                                                        return (
+                                                                                            <div className="flex gap-2 items-center">
+                                                                                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px] px-1 py-0 h-5">提出済</Badge>
+                                                                                                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => openReportDialog(booking.id, booking.report)}>編集</Button>
+                                                                                            </div>
+                                                                                        );
+                                                                                    } else if (isStarted) {
+                                                                                        return <Button size="sm" onClick={() => openReportDialog(booking.id)} className="h-6 text-xs bg-orange-600 hover:bg-orange-700 text-white px-2">カルテ</Button>;
                                                                                     }
-                                                                                }}
-                                                                                disabled={isPending}
-                                                                            >
-                                                                                削除
-                                                                            </Button>
-                                                                        )}
-
-                                                                        {/* Add Instructor Button - Always visible for GROUP/SPECIAL shifts */}
-                                                                        {(shift.type === "GROUP" || shift.type === "SPECIAL_PACK") && (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-6 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
-                                                                                onClick={() => {
-                                                                                    setSelectedShiftForInstructor(shift.id);
-                                                                                    setIsAddInstructorDialogOpen(true);
-                                                                                }}
-                                                                                disabled={isPending}
-                                                                            >
-                                                                                講師を追加
-                                                                            </Button>
-                                                                        )}
+                                                                                    return <span className="text-[10px] text-muted-foreground">未実施</span>;
+                                                                                })()}
+                                                                            </div>
+                                                                        ))}
                                                                     </div>
-                                                                </>
-                                                            );
+                                                                );
+                                                            } else {
+                                                                return (
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="text-xs text-muted-foreground">予約なし</span>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="h-6 text-xs"
+                                                                            onClick={() => {
+                                                                                setForceBookShiftId(shift.id);
+                                                                                setShowForceBookDialog(true);
+                                                                            }}
+                                                                        >
+                                                                            生徒を予約
+                                                                        </Button>
+                                                                    </div>
+                                                                );
+                                                            }
                                                         })()}
+
+                                                        {/* Shift Actions (Delete / Add Instructor) */}
+                                                        <div className="flex justify-end gap-2 border-t pt-2 mt-1">
+                                                            {/* Add Instructor Button */}
+                                                            {(shift.type === "GROUP" || shift.type === "SPECIAL_PACK") && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-6 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                                                    onClick={() => {
+                                                                        setSelectedShiftForInstructor(shift.id);
+                                                                        setIsAddInstructorDialogOpen(true);
+                                                                    }}
+                                                                    disabled={isPending}
+                                                                >
+                                                                    講師を追加
+                                                                </Button>
+                                                            )}
+
+                                                            {/* Delete Button */}
+                                                            {new Date(shift.start).getTime() - new Date().getTime() > 24 * 60 * 60 * 1000 && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                    onClick={() => {
+                                                                        const hasBooking = shift.bookings.some(b => b.status === 'CONFIRMED');
+                                                                        const message = hasBooking
+                                                                            ? "このシフトには予約が入っています。\n削除すると予約もキャンセルされます。\n本当に削除しますか？"
+                                                                            : "このシフトを削除しますか？";
+
+                                                                        if (confirm(message)) {
+                                                                            startTransition(async () => {
+                                                                                const res = await deleteShift(shift.id);
+                                                                                if (!res.success) alert(res.error);
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    disabled={isPending}
+                                                                >
+                                                                    削除
+                                                                </Button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             ))
