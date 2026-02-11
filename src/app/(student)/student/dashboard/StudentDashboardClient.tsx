@@ -312,7 +312,11 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                                     <div className="text-lg">{formatDate(selectedShiftForBooking.start)}</div>
                                     <div className="text-xl text-blue-600">{formatTime(selectedShiftForBooking.start)} - {formatTime(selectedShiftForBooking.end)}</div>
                                     <div className="mt-2 text-sm text-muted-foreground">
-                                        担当: {selectedInstructor?.name} <br />
+                                        担当: {selectedShiftForBooking.instructor?.name || selectedInstructor?.name}
+                                        {selectedShiftForBooking.shiftInstructors && selectedShiftForBooking.shiftInstructors.length > 0 && (
+                                            <span>, {selectedShiftForBooking.shiftInstructors.map(si => si.instructor.name).join(", ")}</span>
+                                        )}
+                                        <br />
                                         場所: {getLocationLabel(selectedShiftForBooking.location)}
                                     </div>
                                 </div>

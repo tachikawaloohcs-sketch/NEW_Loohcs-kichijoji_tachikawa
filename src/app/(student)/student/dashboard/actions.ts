@@ -21,19 +21,40 @@ export async function getDetailedShifts(instructorId: string) {
     // Database stores times in UTC, so we can directly compare with current time
     const shifts = await prisma.shift.findMany({
         where: {
-            instructorId,
+            OR: [
+                { instructorId: instructorId },
+                {
+                    shiftInstructors: {
+                        some: {
+                            instructorId: instructorId
+                        }
+                    }
+                }
+            ],
             start: {
                 gte: new Date(),
             },
             isPublished: true,
-            bookings: {
-                none: { status: "CONFIRMED" } // Only unbooked slots for Individual?
-                // Simply: findMany and filter in client or here.
-                // Let's filter here if type is INDIVIDUAL.
-            }
+            // For INDIVIDUAL, filter in code below
         },
         include: {
             bookings: true,
+            shiftInstructors: {
+                include: {
+                    instructor: {
+                        select: {
+                            id: true,
+                            name: true
+                        }
+                    }
+                }
+            },
+            instructor: { // Main instructor
+                select: {
+                    id: true,
+                    name: true
+                }
+            }
         },
         orderBy: {
             start: 'asc'
