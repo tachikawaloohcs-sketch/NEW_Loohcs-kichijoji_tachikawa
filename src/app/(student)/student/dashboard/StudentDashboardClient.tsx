@@ -30,6 +30,8 @@ interface Shift {
     type: string;
     className?: string | null;
     location?: string;
+    instructor?: { name: string | null };
+    shiftInstructors?: { instructor: { name: string | null } }[];
 }
 
 interface Booking {
