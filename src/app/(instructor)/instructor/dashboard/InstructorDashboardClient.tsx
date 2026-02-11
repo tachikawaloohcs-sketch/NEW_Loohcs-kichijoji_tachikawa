@@ -533,9 +533,9 @@ export default function InstructorDashboardClient({
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">
-                                    {currentShifts.reduce((total, shift) =>
-                                        total + shift.bookings.filter(b => b.status === 'CONFIRMED').length, 0
-                                    )} コマ
+                                    {currentShifts.filter(shift =>
+                                        shift.bookings.some(b => b.status === 'CONFIRMED' || b.status === 'confirmed')
+                                    ).length} コマ
                                 </div>
                                 <p className="text-sm text-muted-foreground">今月の予約数</p>
                             </CardContent>
