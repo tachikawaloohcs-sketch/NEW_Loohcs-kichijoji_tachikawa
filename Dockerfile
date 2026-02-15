@@ -9,20 +9,21 @@ RUN apt-get update -y && apt-get install -y openssl
 COPY package*.json ./
 COPY prisma ./prisma
 
-# Install dependencies (including production)
-RUN npm install
+# Install dependencies using npm ci for consistency
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npm ci
 
 # Copy source
 COPY . .
 
 # Generate Prisma Client
-# Use dummy URL to avoid connection attempt if any
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
-# Build Next.js app
+# Build Next.js app with comprehensive dummy environment
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
-    AUTH_SECRET="dummy_secret_for_build" \
-    NEXTAUTH_SECRET="dummy_secret_for_build" \
+    AUTH_SECRET="dummy_secret_for_build_logic_32bytes_long" \
+    NEXTAUTH_SECRET="dummy_secret_for_build_logic_32bytes_long" \
+    NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
     NODE_OPTIONS="--max-old-space-size=4096" \
     npm run build
 
