@@ -52,7 +52,15 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                 }
 
                 const passwordsMatch = await bcrypt.compare(password, user.password);
-                if (passwordsMatch) return user;
+                if (passwordsMatch) {
+                    return {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                        isProfileComplete: user.isProfileComplete,
+                    };
+                }
 
                 console.log("Invalid credentials");
                 return null;
@@ -79,13 +87,15 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                             imageUrl: (profile as any)?.picture || user.image,
                             role: "STUDENT",
                             isActive: true,
+                            isProfileComplete: false,
                         }
                     });
                 }
 
                 // Set database info to user object so JWT callback can pick it up
-                user.id = dbUser.id;
-                user.role = dbUser.role;
+                (user as any).id = dbUser.id;
+                (user as any).role = dbUser.role;
+                (user as any).isProfileComplete = dbUser.isProfileComplete;
                 return true;
             }
             return true; // Allow credentials

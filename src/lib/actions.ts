@@ -1,6 +1,6 @@
 "use server";
 
-import { signIn, signOut } from "@/auth";
+import { auth, signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
@@ -92,8 +92,9 @@ export async function register(prevState: string | undefined, formData: FormData
                 email,
                 password: hashedPassword,
                 role: role || "STUDENT",
-                bio: bio || null, // Type check trigger
-                imageUrl: imageUrl || null
+                bio: bio || null,
+                imageUrl: imageUrl || null,
+                isProfileComplete: true // Form registration completes it
             },
         });
     } catch (error) {
@@ -101,6 +102,35 @@ export async function register(prevState: string | undefined, formData: FormData
         return "User already exists or database error";
     }
 
+    return "success";
+}
+
+export async function completeProfile(prevState: any, formData: FormData) {
+    const session = await auth();
+    if (!session?.user?.id) return "Unauthorized";
+
+    const name = formData.get("name") as string;
+    const bio = formData.get("bio") as string;
+    const role = formData.get("role") as string;
+
+    if (!name) return "名前を入力してください";
+
+    try {
+        await prisma.user.update({
+            where: { id: session.user.id },
+            data: {
+                name,
+                bio: role === "INSTRUCTOR" ? (bio || null) : null,
+                role: (role === "INSTRUCTOR" || role === "STUDENT") ? role : undefined,
+                isProfileComplete: true
+            }
+        });
+    } catch (error) {
+        console.error("Profile complete error:", error);
+        return "データベースエラーが発生しました";
+    }
+
+    // Auth session needs refresh, but redirecting to dashboard usually works as middleware picks it up
     return "success";
 }
 

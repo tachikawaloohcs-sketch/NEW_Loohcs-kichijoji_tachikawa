@@ -11,20 +11,28 @@ export const authConfig: NextAuthConfig = {
             if (user) {
                 token.role = user.role;
                 token.id = user.id || "";
+                token.isProfileComplete = (user as any).isProfileComplete;
             }
             return token;
         },
         async session({ session, token }) {
             if (token && session.user) {
-                session.user.role = token.role;
-                session.user.id = token.id;
+                session.user.role = token.role as string;
+                session.user.id = token.id as string;
+                (session.user as any).isProfileComplete = token.isProfileComplete;
             }
             return session;
         },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
             const isOnDashboard = nextUrl.pathname.includes("/dashboard");
+            const isOnSetupPage = nextUrl.pathname === "/setup-profile";
             const role = auth?.user?.role;
+            const isProfileComplete = (auth?.user as any)?.isProfileComplete;
+
+            if (isLoggedIn && !isProfileComplete && !isOnSetupPage && !nextUrl.pathname.startsWith("/api/auth")) {
+                return Response.redirect(new URL("/setup-profile", nextUrl));
+            }
 
             // Dashboard logic
             if (isOnDashboard) {
