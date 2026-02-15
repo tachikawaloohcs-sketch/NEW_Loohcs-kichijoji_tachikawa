@@ -95,7 +95,7 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                                 </Avatar>
                                 <div>
                                     <div className="font-semibold">{student.name}</div>
-                                    <div className="text-xs text-muted-foreground">{student.email}</div>
+                                    <div className="text-xs text-muted-foreground">{student.email || "LINE連携のみ"}</div>
                                     <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentBookings.length - 1}</div>
                                 </div>
                             </div>
@@ -111,7 +111,7 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                         <div className="flex justify-between items-start">
                             <div>
                                 <h2 className="text-2xl font-bold">{selectedStudent.name} さんのカルテ一覧</h2>
-                                <p className="text-muted-foreground">{selectedStudent.email}</p>
+                                <p className="text-muted-foreground">{selectedStudent.email || "LINE連携のみ"}</p>
                             </div>
                             <div className="flex gap-2">
                                 {editable && onUpdateProfile && (

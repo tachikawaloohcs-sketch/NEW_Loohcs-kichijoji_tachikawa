@@ -357,7 +357,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                         {allUsers.filter((u: any) => !u.archivedAt).map((user) => (
                                             <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-4">{user.name}</td>
-                                                <td className="p-4">{user.email}</td>
+                                                <td className="p-4">{user.email || "LINE連携のみ"}</td>
                                                 <td className="p-4">{user.role}</td>
                                                 <td className="p-4">
                                                     <Button
@@ -462,7 +462,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                         {archivedUsers.map((user: any) => (
                                             <tr key={user.id} className="border-b transition-colors hover:bg-muted/50">
                                                 <td className="p-4 font-medium">{user.name}</td>
-                                                <td className="p-4 text-muted-foreground">{user.email}</td>
+                                                <td className="p-4 text-muted-foreground">{user.email || "LINE連携のみ"}</td>
                                                 <td className="p-4">
                                                     <div>{user.archiveYear}年度</div>
                                                     <Badge variant="outline" className="mt-1">{user.role}</Badge>
