@@ -40,6 +40,16 @@ else
   echo ""
   if [ -z "$EXTERNAL_DB_URL" ]; then echo "Database URL is required."; exit 1; fi
   
+  # Auto-append ?pgbouncer=true if using Supabase Pooler (port 6543)
+  if [[ "$EXTERNAL_DB_URL" == *":6543"* ]] && [[ "$EXTERNAL_DB_URL" != *"pgbouncer=true"* ]]; then
+    if [[ "$EXTERNAL_DB_URL" == *"?"* ]]; then
+      EXTERNAL_DB_URL="${EXTERNAL_DB_URL}&pgbouncer=true"
+    else
+      EXTERNAL_DB_URL="${EXTERNAL_DB_URL}?pgbouncer=true"
+    fi
+    echo "Notice: Detected Supabase Pooler port 6543. Added ?pgbouncer=true to the URL."
+  fi
+
   DATABASE_URL_ENV="DATABASE_URL=$EXTERNAL_DB_URL"
   CLOUDSQL_FLAG=""
 fi
