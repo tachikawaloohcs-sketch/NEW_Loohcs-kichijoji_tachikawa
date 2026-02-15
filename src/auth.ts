@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Line from "next-auth/providers/line";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
@@ -7,6 +8,11 @@ import { authConfig } from "@/auth.config";
 export const { auth, signIn, signOut, handlers } = NextAuth({
     ...authConfig,
     providers: [
+        Line({
+            clientId: process.env.NEXT_PUBLIC_LINE_LOGIN_ID,
+            clientSecret: process.env.LINE_LOGIN_SECRET,
+            authorization: { params: { scope: "profile openid" } },
+        }),
         Credentials({
             async authorize(credentials) {
                 if (credentials.id && credentials.password === "next-auth-bypass") {

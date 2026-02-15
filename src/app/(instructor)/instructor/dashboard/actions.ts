@@ -8,6 +8,7 @@ import { ja } from "date-fns/locale";
 
 // Mock Email Function
 import { sendEmail } from "@/lib/mail";
+import { sendLineMessage } from "@/lib/line";
 
 // Get all instructors for multi-select UI
 export async function getAllInstructors() {
@@ -428,17 +429,36 @@ export async function deleteShift(shiftId: string) {
 
         const body = `${dateStr} ${timeStr} ${locationText} ${typeText} ${instructorName} 講師の予約がキャンセルされました。`;
 
+        // Collect bookings to notify before deleting
+        // We need to fetch students' lineUserIds. "shift.bookings" from line 379 might just be scalars if we didn't include student.
+        // Let's refetch bookings with student info or just rely on IDs and fetch individually (slower but safer if we don't change top query).
+        // Let's change top query to include student.
+        // Doing it here locally to avoid touching top query if it complicates things?
+        // Actually line 379 is simple. Let's assume I change it below in same edit.
+
         // Notify Students
         for (const booking of bookingsToNotify) {
-            const student = await prisma.user.findUnique({ where: { id: booking.studentId } });
-            if (student?.email) {
-                await sendEmail(student.email, "予約がキャンセルされました。", body);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const bookingAny = booking as any;
+            if (bookingAny.student?.lineUserId) {
+                await sendLineMessage(bookingAny.student.lineUserId, body);
+            } else {
+                // Fallback if student not included or no lineUserId?
+                // Try fetching if missing
+                const student = await prisma.user.findUnique({ where: { id: booking.studentId } });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if ((student as any)?.lineUserId) {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    await sendLineMessage((student as any).lineUserId, body);
+                }
             }
         }
 
         // Notify Instructor (Confirmation)
-        if (instructorEmail) {
-            await sendEmail(instructorEmail, "予約がキャンセルされました。", body);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const instructorAny = instructor as any;
+        if (instructorAny?.lineUserId) {
+            await sendLineMessage(instructorAny.lineUserId, body);
         }
 
         revalidatePath("/instructor/dashboard");
@@ -499,11 +519,14 @@ export async function approveRequest(requestId: string) {
         // getLocationLabel helper needs to be duplicated or imported. Let's simplify or duplicate for now.
         const typeText = getTypeLabel(request.type);
 
-        await sendEmail(
-            request.student.email,
-            "日程リクエストが承認されました",
-            `${dateStr} ${timeStr} ${locationText} ${typeText} のリクエストが ${request.instructor.name} 講師により承認されました。`
-        );
+        const body = `${dateStr} ${timeStr} ${locationText} ${typeText} のリクエストが ${request.instructor.name} 講師により承認されました。`;
+
+        // Notify Student
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const studentAny = request.student as any;
+        if (studentAny.lineUserId) {
+            await sendLineMessage(studentAny.lineUserId, body);
+        }
 
         revalidatePath("/instructor/dashboard");
         return { success: true };
@@ -548,11 +571,13 @@ export async function rejectRequest(requestId: string) {
         // 件名: 日程リクエストが却下されました
         // 本文: リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。
 
-        await sendEmail(
-            request.student.email,
-            "日程リクエストが却下されました",
-            `リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。`
-        );
+        const body = "リクエストされた日程は都合により承認されませんでした。別の日程で再度ご検討ください。";
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const studentAny = request.student as any;
+        if (studentAny.lineUserId) {
+            await sendLineMessage(studentAny.lineUserId, body);
+        }
 
         revalidatePath("/instructor/dashboard");
         return { success: true };

@@ -107,3 +107,7 @@ export async function register(prevState: string | undefined, formData: FormData
 export async function logout() {
     await signOut();
 }
+
+export async function lineLogin() {
+    await signIn("line");
+}

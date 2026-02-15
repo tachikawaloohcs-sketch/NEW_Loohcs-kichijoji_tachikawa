@@ -8,6 +8,7 @@ import { ja } from "date-fns/locale";
 
 // Mock Email Function
 import { sendEmail } from "@/lib/mail";
+import { sendLineMessage } from "@/lib/line";
 
 export async function getInstructors() {
     const instructors = await prisma.user.findMany({
@@ -152,9 +153,20 @@ export async function createBooking(shiftId: string, meetingType: string = "ONLI
         const body = `${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。\nキャンセルは授業1日前までできます。`;
 
         // To Student
-        await sendEmail(session.user.email!, "予約確定しました。", body);
+        // To Student
+        const student = await prisma.user.findUnique({ where: { id: session.user.id } });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((student as any)?.lineUserId) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await sendLineMessage((student as any).lineUserId, body);
+        }
+
         // To Instructor
-        await sendEmail(shift.instructor.email, "予約確定しました。", body); // Same body? "Request" says (Both).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const instructor = shift.instructor as any;
+        if (instructor.lineUserId) {
+            await sendLineMessage(instructor.lineUserId, body);
+        }
 
         revalidatePath("/student/dashboard");
         return { success: true, booking };
@@ -219,7 +231,8 @@ export async function createRequest(instructorId: string, date: Date, startTime:
                 type: type,
                 status: "PENDING"
             },
-            include: { instructor: { select: { email: true, name: true } }, student: { select: { name: true } } }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            include: { instructor: { select: { email: true, name: true, lineUserId: true } as any }, student: { select: { name: true } } }
         });
 
         // Notify Instructor
@@ -235,11 +248,15 @@ export async function createRequest(instructorId: string, date: Date, startTime:
         const typeText = getTypeLabel(type);
         const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/instructor/dashboard`;
 
-        await sendEmail(
-            request.instructor.email,
-            "新しい日程リクエストが届きました",
-            `生徒 ${request.student.name} から ${dateStr} ${format(startDateTime, "HH:mm", { locale: ja })} - ${format(endDateTime, "HH:mm", { locale: ja })} ${locationText} ${typeText} の日程リクエストが届きました。\nダッシュボードから承認・却下を行ってください。\n\n${dashboardUrl}`
-        );
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const reqAny = request as any;
+        const body = `生徒 ${reqAny.student.name} から ${dateStr} ${format(startDateTime, "HH:mm", { locale: ja })} - ${format(endDateTime, "HH:mm", { locale: ja })} ${locationText} ${typeText} の日程リクエストが届きました。\nダッシュボードから承認・却下を行ってください。\n\n${dashboardUrl}`;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const instructor = reqAny.instructor as any;
+        if (instructor.lineUserId) {
+            await sendLineMessage(instructor.lineUserId, body);
+        }
 
         revalidatePath("/student/dashboard");
         return { success: true };

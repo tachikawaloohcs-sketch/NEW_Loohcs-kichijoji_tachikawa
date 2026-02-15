@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { authenticate } from "@/lib/actions";
+import { authenticate, lineLogin } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,28 @@ export default function LoginPage() {
                             </div>
                         </div>
 
+
                         <LoginButton />
+
+                        <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">
+                                    または
+                                </span>
+                            </div>
+                        </div>
+
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full bg-[#06C755] text-white hover:bg-[#05b34c] hover:text-white border-none"
+                            onClick={() => lineLogin()}
+                        >
+                            LINEでログイン
+                        </Button>
 
                         {errorMessage && (
                             <div className="text-red-500 text-sm">{errorMessage}</div>

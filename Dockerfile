@@ -1,78 +1,30 @@
-FROM node:20-slim AS base
+FROM node:20-slim
 
-# Install dependencies only when needed
-FROM base AS deps
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
+# Install openssl for Prisma
+RUN apt-get update -y && apt-get install -y openssl
+
+# Dependencies
+COPY package*.json ./
 COPY prisma ./prisma
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile --ignore-scripts; \
-  elif [ -f package-lock.json ]; then npm ci --ignore-scripts; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile --ignore-scripts; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
 
+# Install dependencies (including production)
+RUN rm -f package-lock.json
+RUN npm install
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy source
 COPY . .
 
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED 1
-
 # Generate Prisma Client
-RUN npx prisma generate
+# Use dummy URL to avoid connection attempt if any
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
-RUN \
-  if [ -f yarn.lock ]; then yarn run build; \
-  elif [ -f package-lock.json ]; then npm run build; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
+# Build Next.js app
+RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
-
-ENV NODE_ENV production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED 1
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY migrate.sh ./migrate.sh
-RUN chmod +x ./migrate.sh
-
-# Install OpenSSL for Prisma in runner stage
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-RUN npm install -g prisma@6.19.2
-
-USER nextjs
-
+# Expose port
 EXPOSE 3000
 
-# set hostname to localhost
-ENV HOSTNAME "0.0.0.0"
-
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["/bin/sh", "-c", "./migrate.sh & node server.js"]
+# Start command
+CMD ["npm", "start"]

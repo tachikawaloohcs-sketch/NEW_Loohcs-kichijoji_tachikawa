@@ -72,6 +72,12 @@ CMD="gcloud run deploy reservation-service \
   --set-env-vars \"AUTH_SECRET=$AUTH_SECRET\" \
   --set-env-vars \"AUTH_TRUST_HOST=true\" \
   --set-env-vars \"NEXTAUTH_URL=https://reservation-service-1062807300473.asia-northeast1.run.app\" \
+  --set-env-vars \"NEXT_PUBLIC_APP_URL=https://reservation-service-1062807300473.asia-northeast1.run.app\" \
+  --set-env-vars \"LINE_CHANNEL_ID=2009135338\" \
+  --set-env-vars \"LINE_CHANNEL_SECRET=bbbedca8284bf903b3db2aa7b240ecf0\" \
+  --set-env-vars \"LINE_ACCESS_TOKEN=DxDgHOVr/qCVCALX1VaaIcvtpcfPaCSP2iGJE6fJ4ZxyYM79gcopHR2sd6vWLQPTEkD08Qs13GvE4pPzRCAxEgrj2300Xu/szhRRMtBl2MOtSyRI0FUTDeCK7GisSRlZa7bp5LhXkeh+k2unOyO37wdB04t89/1O/w1cDnyilFU=\" \
+  --set-env-vars \"NEXT_PUBLIC_LINE_LOGIN_ID=2009135380\" \
+  --set-env-vars \"LINE_LOGIN_SECRET=fee5809a97a361dc3d50fb720fb40925\" \
   --memory 1Gi \
   --timeout 600"
 
