@@ -20,7 +20,11 @@ COPY . .
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
 
 # Build Next.js app
-RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npm run build
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
+    AUTH_SECRET="dummy_secret_for_build" \
+    NEXTAUTH_SECRET="dummy_secret_for_build" \
+    NODE_OPTIONS="--max-old-space-size=4096" \
+    npm run build
 
 # Expose port
 EXPOSE 3000
