@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 interface User {
     id: string;
     name: string | null;
-    email: string;
+    email?: string | null;
     bio: string | null;
     imageUrl: string | null;
 }

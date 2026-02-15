@@ -16,6 +16,7 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
+    submittedLate: boolean;
     createdAt: Date | string;
     updatedAt: Date | string;
 }
@@ -23,7 +24,7 @@ interface Report {
 interface User {
     id: string;
     name: string | null;
-    email: string;
+    email?: string | null;
     role: string;
     isActive: boolean;
     _count?: {
@@ -61,7 +62,7 @@ interface Booking {
 interface Student {
     id: string;
     name: string | null;
-    email: string;
+    email?: string | null;
     studentBookings: Booking[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     admissionResults?: any[];

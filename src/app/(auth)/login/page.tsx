@@ -23,73 +23,89 @@ function LoginButton() {
 export default function LoginPage() {
     const [errorMessage, dispatch] = useActionState(authenticate, undefined);
     const [showPassword, setShowPassword] = useState(false);
+    const [isAdminMode, setIsAdminMode] = useState(false);
 
     return (
-        <div className="flex h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950">
-            <Card className="w-full max-w-sm">
-                <CardHeader>
-                    <CardTitle>ログイン</CardTitle>
-                    <CardDescription>Loohcs志塾立川・吉祥寺校予約システムへようこそ</CardDescription>
+        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200 dark:from-slate-900 dark:to-slate-950">
+            <Card className="w-full max-w-sm shadow-2xl border-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
+                <CardHeader className="text-center space-y-2">
+                    <CardTitle className="text-2xl font-bold tracking-tight">Loohcs 予約システム</CardTitle>
+                    <CardDescription>立川・吉祥寺校へようこそ</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <form action={dispatch} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">メールアドレス</Label>
-                            <Input id="email" type="email" name="email" required placeholder="user@example.com" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">パスワード</Label>
-                            <div className="relative">
-                                <Input
-                                    id="password"
-                                    type={showPassword ? "text" : "password"}
-                                    name="password"
-                                    required
-                                />
+                <CardContent className="space-y-6">
+                    {!isAdminMode ? (
+                        <div className="space-y-4 py-4">
+                            <Button
+                                type="button"
+                                className="w-full h-12 text-lg font-bold bg-[#06C755] text-white hover:bg-[#05b34c] transition-all rounded-xl shadow-lg hover:shadow-[#06C755]/20 border-none"
+                                onClick={() => lineLogin()}
+                            >
+                                LINEでログイン
+                            </Button>
+                            <p className="text-xs text-center text-muted-foreground px-4">
+                                ログインすると利用規約およびプライバシーポリシーに同意したことになります。
+                            </p>
+
+                            <div className="pt-4 flex justify-center">
                                 <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                                    tabIndex={-1}
+                                    onClick={() => setIsAdminMode(true)}
+                                    className="text-xs text-slate-400 hover:text-primary transition-colors hover:underline"
                                 >
-                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    管理者ログインはこちら
                                 </button>
                             </div>
                         </div>
-
-
-                        <LoginButton />
-
-                        <div className="relative my-4">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t" />
+                    ) : (
+                        <form action={dispatch} className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="space-y-2 text-center pb-2">
+                                <h3 className="font-semibold text-sm">管理者ログイン</h3>
+                                <p className="text-xs text-muted-foreground">管理者用メールアドレスでログインしてください</p>
                             </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-background px-2 text-muted-foreground">
-                                    または
-                                </span>
+                            <div className="space-y-2">
+                                <Label htmlFor="email" className="text-xs font-medium uppercase tracking-wider text-slate-500">メールアドレス</Label>
+                                <Input id="email" type="email" name="email" required placeholder="admin@example.com" className="bg-slate-50/50 dark:bg-slate-950/50" />
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password" aria-label="パスワード" className="text-xs font-medium uppercase tracking-wider text-slate-500">パスワード</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="password"
+                                        type={showPassword ? "text" : "password"}
+                                        name="password"
+                                        required
+                                        className="bg-slate-50/50 dark:bg-slate-950/50"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <LoginButton />
+
+                            <div className="pt-2 flex justify-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsAdminMode(false)}
+                                    className="text-xs text-slate-400 hover:text-primary transition-colors hover:underline"
+                                >
+                                    ← LINEログインに戻る
+                                </button>
+                            </div>
+                        </form>
+                    )}
+
+                    {errorMessage && (
+                        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm text-center font-medium animate-shake">
+                            {errorMessage}
                         </div>
-
-                        <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full bg-[#06C755] text-white hover:bg-[#05b34c] hover:text-white border-none"
-                            onClick={() => lineLogin()}
-                        >
-                            LINEでログイン
-                        </Button>
-
-                        {errorMessage && (
-                            <div className="text-red-500 text-sm">{errorMessage}</div>
-                        )}
-                    </form>
+                    )}
                 </CardContent>
-                <CardFooter className="justify-center">
-                    <Link href="/register" className="text-sm text-primary hover:underline">
-                        アカウントを作成する
-                    </Link>
-                </CardFooter>
             </Card>
         </div>
     );

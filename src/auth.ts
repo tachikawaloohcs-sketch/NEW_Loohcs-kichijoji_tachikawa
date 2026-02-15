@@ -45,6 +45,12 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                     return null;
                 }
 
+                // Check if user has a password (might be LINE-only)
+                if (!user.password) {
+                    console.log("User has no password (LINE-only account)");
+                    return null;
+                }
+
                 const passwordsMatch = await bcrypt.compare(password, user.password);
                 if (passwordsMatch) return user;
 
@@ -53,4 +59,37 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
             },
         }),
     ],
+    callbacks: {
+        async signIn({ user, account, profile }) {
+            if (account?.provider === "line") {
+                const lineUserId = profile?.sub as string;
+                if (!lineUserId) return false;
+
+                // Find user by LINE ID
+                let dbUser = await prisma.user.findUnique({
+                    where: { lineUserId: lineUserId }
+                });
+
+                if (!dbUser) {
+                    // Auto-create as STUDENT if not found
+                    dbUser = await prisma.user.create({
+                        data: {
+                            lineUserId: lineUserId,
+                            name: profile?.name as string || user.name,
+                            imageUrl: (profile as any)?.picture || user.image,
+                            role: "STUDENT",
+                            isActive: true,
+                        }
+                    });
+                }
+
+                // Set database info to user object so JWT callback can pick it up
+                user.id = dbUser.id;
+                user.role = dbUser.role;
+                return true;
+            }
+            return true; // Allow credentials
+        },
+        ...authConfig.callbacks,
+    }
 });

@@ -47,7 +47,7 @@ interface Shift {
 
 interface Request {
     id: string;
-    student: { name: string | null; email: string };
+    student: { name: string | null; email?: string | null };
     start: Date;
     end: Date;
     status: string;
@@ -76,7 +76,7 @@ interface StudentBooking {
 interface Student {
     id: string;
     name: string | null;
-    email: string;
+    email?: string | null;
     studentBookings: StudentBooking[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     admissionResults?: any[];
@@ -97,7 +97,7 @@ export default function InstructorDashboardClient({
     archivedStudents?: Student[],
     deadlineExtensionHours?: number,
     currentUser?: any,
-    instructors?: { id: string; name: string | null; email: string }[]
+    instructors?: { id: string; name: string | null; email?: string | null }[]
 }) {
     const [date, setDate] = useState<Date | undefined>(new Date());
 

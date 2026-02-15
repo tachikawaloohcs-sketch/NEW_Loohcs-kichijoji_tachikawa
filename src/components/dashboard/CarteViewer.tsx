@@ -42,7 +42,7 @@ interface AdmissionResult {
 interface Student {
     id: string;
     name: string | null;
-    email: string;
+    email?: string | null;
     studentBookings: Booking[];
     admissionResults?: AdmissionResult[];
     // Profile Fields

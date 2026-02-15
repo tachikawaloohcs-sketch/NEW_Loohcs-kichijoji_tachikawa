@@ -14,8 +14,8 @@ datasource db {
 model User {
   id                String   @id @default(cuid())
   name              String?
-  email             String   @unique
-  password          String // Hashed password
+  email             String?  @unique
+  password          String? // Optional for LINE-only users
   bio               String? // Instructor bio/subjects
   imageUrl          String? // Avatar image URL
   role              String // "ADMIN", "INSTRUCTOR", "STUDENT"
