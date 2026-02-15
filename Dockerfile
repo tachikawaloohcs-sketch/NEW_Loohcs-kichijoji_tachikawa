@@ -37,5 +37,8 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" \
 # Expose port
 EXPOSE 3000
 
+# Make migrate script executable
+RUN chmod +x migrate.sh
+
 # Start command
-CMD ["npm", "start"]
+CMD ["/bin/sh", "-c", "./migrate.sh && npm start"]
