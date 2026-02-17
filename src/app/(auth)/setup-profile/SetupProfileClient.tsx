@@ -32,8 +32,9 @@ export default function SetupProfileClient({ user }: { user: User }) {
             if (role === "ADMIN") redirectUrl = "/admin/dashboard";
             else if (role === "INSTRUCTOR") redirectUrl = "/instructor/dashboard";
 
-            // Use window.location for a hard redirect to ensure session refresh
-            window.location.href = redirectUrl;
+            // Use router for smoother transition, then refresh to update session
+            router.push(redirectUrl);
+            router.refresh();
         }
     }, [state, selectedRole]);
 
