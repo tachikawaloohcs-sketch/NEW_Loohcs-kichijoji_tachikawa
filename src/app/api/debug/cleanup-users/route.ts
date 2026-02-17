@@ -53,10 +53,21 @@ export async function GET(req: NextRequest) {
                 // 関連データの削除 (単純化: Bookings/Reports/Shift などはCascade設定または下記で対応)
 
                 // 生徒の場合
+                // Bookingに紐づくReportを先に削除する必要がある
+                const studentBookings = await prisma.booking.findMany({
+                    where: { studentId: user.id },
+                    select: { id: true }
+                });
+                const studentBookingIds = studentBookings.map(b => b.id);
+                if (studentBookingIds.length > 0) {
+                    await prisma.report.deleteMany({
+                        where: { bookingId: { in: studentBookingIds } }
+                    });
+                }
+
                 await prisma.booking.deleteMany({ where: { studentId: user.id } });
                 await prisma.scheduleRequest.deleteMany({ where: { studentId: user.id } });
                 await prisma.admissionResult.deleteMany({ where: { studentId: user.id } });
-                // Report is tricky if user is student vs instructor. Usually Report links Booking which we just deleted.
 
                 // 講師の場合
                 // Instructor shifts need to be deleted carefully.
@@ -69,9 +80,21 @@ export async function GET(req: NextRequest) {
 
                 const shiftIds = instructorShifts.map(s => s.id);
                 if (shiftIds.length > 0) {
-                    await prisma.booking.deleteMany({
-                        where: { shiftId: { in: shiftIds } }
+                    // Bookingに紐づくReportを削除
+                    const shiftBookings = await prisma.booking.findMany({
+                        where: { shiftId: { in: shiftIds } },
+                        select: { id: true }
                     });
+                    const shiftBookingIds = shiftBookings.map(b => b.id);
+                    if (shiftBookingIds.length > 0) {
+                        await prisma.report.deleteMany({
+                            where: { bookingId: { in: shiftBookingIds } }
+                        });
+                        await prisma.booking.deleteMany({
+                            where: { id: { in: shiftBookingIds } }
+                        });
+                    }
+
                     await prisma.shiftInstructor.deleteMany({
                         where: { shiftId: { in: shiftIds } }
                     });
@@ -89,7 +112,7 @@ export async function GET(req: NextRequest) {
                 deletedCount++;
             } catch (error) {
                 console.error(`Error deleting user ${user.name}:`, error);
-                skippedUsers.push(`ERROR: ${user.name} (${error.message})`);
+                skippedUsers.push(`ERROR: ${user.name} (${(error as any).message})`);
             }
         }
 
