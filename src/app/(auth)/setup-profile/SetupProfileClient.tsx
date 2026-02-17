@@ -78,16 +78,35 @@ export default function SetupProfileClient({ user }: { user: User }) {
                     </div>
 
                     {selectedRole === "STUDENT" && (
-                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <Label className="text-base font-semibold">所属校舎</Label>
-                            <Tabs defaultValue={selectedCampus} onValueChange={(v) => setSelectedCampus(v)} className="w-full">
-                                <TabsList className="grid grid-cols-2 w-full h-11">
-                                    <TabsTrigger value="TACHIKAWA" className="text-sm">立川校舎</TabsTrigger>
-                                    <TabsTrigger value="KICHIJOJI" className="text-sm">吉祥寺校舎</TabsTrigger>
-                                </TabsList>
-                                <input type="hidden" name="campus" value={selectedCampus} />
-                            </Tabs>
-                        </div>
+                        <>
+                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <Label className="text-base font-semibold">所属校舎</Label>
+                                <Tabs defaultValue={selectedCampus} onValueChange={(v) => setSelectedCampus(v)} className="w-full">
+                                    <TabsList className="grid grid-cols-2 w-full h-11">
+                                        <TabsTrigger value="TACHIKAWA" className="text-sm">立川校舎</TabsTrigger>
+                                        <TabsTrigger value="KICHIJOJI" className="text-sm">吉祥寺校舎</TabsTrigger>
+                                    </TabsList>
+                                    <input type="hidden" name="campus" value={selectedCampus} />
+                                </Tabs>
+                            </div>
+
+                            <div className="space-y-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-300">
+                                <Label className="text-base font-semibold">保護者情報の登録（推奨）</Label>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    保護者様用のアカウントを作成・連携します。<br />
+                                    登録すると、保護者様も学習状況を確認できるようになります。<br />
+                                    <span className="text-amber-600 font-medium">※未登録の場合は空欄で構いません。</span>
+                                </p>
+                                <div className="space-y-2">
+                                    <Label htmlFor="parentEmail" className="text-sm">保護者メールアドレス</Label>
+                                    <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@example.com" className="h-10 rounded-lg" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="parentPassword" className="text-sm">保護者パスワード</Label>
+                                    <Input id="parentPassword" name="parentPassword" type="password" placeholder="ログイン用パスワード" className="h-10 rounded-lg" minLength={6} />
+                                </div>
+                            </div>
+                        </>
                     )}
 
                     {selectedRole === "INSTRUCTOR" && (

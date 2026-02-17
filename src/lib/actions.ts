@@ -114,7 +114,42 @@ export async function completeProfile(prevState: any, formData: FormData) {
     const role = formData.get("role") as string;
     const campus = formData.get("campus") as string;
 
-    if (!name) return "名前を入力してください";
+    const parentEmail = formData.get("parentEmail") as string;
+    const parentPassword = formData.get("parentPassword") as string;
+
+    let parentId: string | undefined;
+
+    if (role === "STUDENT" && parentEmail) {
+        if (!parentPassword || parentPassword.length < 6) return "保護者パスワードは6文字以上で入力してください";
+        try {
+            const hashedPassword = await bcrypt.hash(parentPassword, 10);
+            let parent = await prisma.user.findUnique({ where: { email: parentEmail } });
+
+            if (!parent) {
+                parent = await prisma.user.create({
+                    data: {
+                        name: "保護者",
+                        email: parentEmail,
+                        password: hashedPassword,
+                        role: "PARENT",
+                        isActive: true,
+                        isProfileComplete: true
+                    }
+                });
+            } else {
+                if (parent.role !== 'ADMIN' && parent.role !== 'INSTRUCTOR' && parent.role !== 'STUDENT' && parent.role !== 'PARENT') {
+                    await prisma.user.update({
+                        where: { id: parent.id },
+                        data: { role: 'PARENT' }
+                    });
+                }
+            }
+            parentId = parent.id;
+        } catch (e) {
+            console.error("Parent creation failed", e);
+            return "保護者アカウントの作成に失敗しました";
+        }
+    }
 
     try {
         const updatedUser = await prisma.user.update({
@@ -124,7 +159,8 @@ export async function completeProfile(prevState: any, formData: FormData) {
                 bio: role === "INSTRUCTOR" ? (bio || null) : null,
                 role: (role === "INSTRUCTOR" || role === "STUDENT") ? role : undefined,
                 campus: campus || null,
-                isProfileComplete: true
+                isProfileComplete: true,
+                parentId: parentId || undefined
             } as any
         });
 
