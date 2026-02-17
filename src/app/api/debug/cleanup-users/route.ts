@@ -103,6 +103,11 @@ export async function GET(req: NextRequest) {
                     });
                 }
 
+                // 講師に関連する残りのリクエストを削除
+                await prisma.scheduleRequest.deleteMany({
+                    where: { instructorId: user.id }
+                });
+
                 // Delete user - let's see if it works. If foreign key constraint fails, we catch error.
                 await prisma.user.delete({
                     where: { id: user.id }
