@@ -90,7 +90,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers, updateStudentProfile, updateAdmissionResults } from "./actions";
+import { archiveUser, unarchiveUser, adminCreateShift, adminCreateBooking, adminDeleteShift, updateGlobalSettings, getArchiveAccesses, grantArchiveAccess, revokeArchiveAccess, getArchivedUsers, updateStudentProfile, updateAdmissionResults, permanentDeleteUser, updateLineUserId } from "./actions";
 import { logout } from "@/lib/actions";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
 
@@ -142,6 +142,26 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
         const res = await updateGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS", deadlineExtension, "カルテ提出期限の延長時間（時間単位）");
         if (res.success) alert("設定を更新しました");
         else alert(res.error);
+    };
+
+    // User Deletion State
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [adminPassword, setAdminPassword] = useState("");
+
+    const handlePermanentDelete = async () => {
+        if (!userToDelete) return;
+        if (!adminPassword) return alert("パスワードを入力してください");
+
+        const res = await permanentDeleteUser(userToDelete.id, adminPassword);
+        if (res.success) {
+            alert(res.message || "完全に削除しました");
+            setIsDeleteDialogOpen(false);
+            setUserToDelete(null);
+            setAdminPassword("");
+        } else {
+            alert(res.error);
+        }
     };
 
     // Archive Access Management
@@ -349,6 +369,7 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                             <th className="p-4 text-left font-medium">名前</th>
                                             <th className="p-4 text-left font-medium">メールアドレス</th>
                                             <th className="p-4 text-left font-medium">権限</th>
+                                            <th className="p-4 text-left font-medium">LINE連携</th>
                                             <th className="p-4 text-left font-medium">操作</th>
                                         </tr>
                                     </thead>
@@ -359,6 +380,36 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                 <td className="p-4">{user.name}</td>
                                                 <td className="p-4">{user.email || "LINE連携のみ"}</td>
                                                 <td className="p-4">{user.role}</td>
+                                                <td className="p-4">
+                                                    <div className="flex flex-col gap-1">
+                                                        {(user as any).lineUserId ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                                                                    連携済み
+                                                                </Badge>
+                                                                <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{(user as any).lineUserId}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-muted-foreground text-xs">未連携</span>
+                                                        )}
+                                                        <Button
+                                                            variant="link"
+                                                            size="sm"
+                                                            className="h-auto p-0 text-[10px] justify-start"
+                                                            onClick={() => {
+                                                                const id = prompt("LINE User IDを入力してください (Uxxxxxxxx...)", (user as any).lineUserId || "");
+                                                                if (id !== null) {
+                                                                    updateLineUserId(user.id, id).then(res => {
+                                                                        if (res.success) alert("更新しました");
+                                                                        else alert(res.error);
+                                                                    });
+                                                                }
+                                                            }}
+                                                        >
+                                                            IDを手動設定
+                                                        </Button>
+                                                    </div>
+                                                </td>
                                                 <td className="p-4">
                                                     <Button
                                                         variant="destructive"
@@ -503,6 +554,17 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                                                                 閲覧権限
                                                             </Button>
                                                         )}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            onClick={() => {
+                                                                setUserToDelete(user);
+                                                                setIsDeleteDialogOpen(true);
+                                                            }}
+                                                        >
+                                                            完全削除
+                                                        </Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -642,6 +704,35 @@ export default function AdminDashboardClient({ students, allUsers, allInstructor
                             })}
                         </div>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Permanent Delete Verification Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-red-500">ユーザーの完全削除</DialogTitle>
+                        <DialogDescription>
+                            <span className="font-bold text-slate-900">{userToDelete?.name}</span> のデータを完全に削除します。<br />
+                            この操作は取り消せません。授業記録、シフト、ログイン情報などすべてが消失します。
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="admin-password">続行するには管理者パスワードを入力してください</Label>
+                            <Input
+                                id="admin-password"
+                                type="password"
+                                placeholder="管理者パスワード"
+                                value={adminPassword}
+                                onChange={(e) => setAdminPassword(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>キャンセル</Button>
+                        <Button variant="destructive" onClick={handlePermanentDelete}>データを完全に削除する</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>

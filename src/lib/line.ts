@@ -11,19 +11,26 @@ const client = new Client({
  * @param text - The message text
  */
 export const sendLineMessage = async (userId: string, text: string) => {
+    console.log(`[LINE Message Attempt] To: ${userId}`);
+
     if (!process.env.LINE_ACCESS_TOKEN) {
         console.warn('LINE_ACCESS_TOKEN is not set. Skipping LINE message.');
         console.log(`[Mock LINE] To: ${userId}, Text: ${text}`);
         return;
     }
 
+    if (!userId) {
+        console.warn('userId is missing. Skipping LINE message.');
+        return;
+    }
+
     try {
         await client.pushMessage(userId, { type: 'text', text: text });
-        console.log(`LINE message sent to ${userId}`);
+        console.log(`[LINE Message Sent] To: ${userId}`);
     } catch (error: any) {
-        console.error('Error sending LINE message:', error);
+        console.error('[LINE Message Error] To:', userId, 'Error:', error);
         if (error.originalError && error.originalError.response) {
-            console.error(error.originalError.response.data);
+            console.error('LINE Response Data:', error.originalError.response.data);
         }
     }
 };

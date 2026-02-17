@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getDetailedShifts, createBooking, createRequest } from "./actions";
-import { format } from "date-fns";
+import { getDetailedShifts, createBooking, createRequest, cancelBooking } from "./actions";
+import { format, isBefore, startOfDay, subDays } from "date-fns";
 import { ja } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,7 @@ interface Shift {
 interface Booking {
     id: string;
     shift: {
+        id: string;
         start: Date;
         end: Date;
         type: string;
@@ -292,6 +293,37 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                                                 {booking.meetingType === 'IN_PERSON' ? '対面受講' : 'オンライン受講'}
                                             </div>
                                         </div>
+                                        {(() => {
+                                            const lessonDate = startOfDay(new Date(booking.shift.start));
+                                            const deadline = subDays(lessonDate, 1);
+                                            const canCancel = isBefore(new Date(), deadline);
+
+                                            if (!canCancel) return null;
+
+                                            return (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={() => {
+                                                        if (confirm("この予約をキャンセルしますか？")) {
+                                                            startTransition(async () => {
+                                                                const res = await cancelBooking(booking.id);
+                                                                if (res.success) {
+                                                                    alert("キャンセルしました");
+                                                                    window.location.reload();
+                                                                } else {
+                                                                    alert(res.error);
+                                                                }
+                                                            });
+                                                        }
+                                                    }}
+                                                    disabled={isPending}
+                                                >
+                                                    キャンセル
+                                                </Button>
+                                            );
+                                        })()}
                                     </div>
                                 ))
                             )}

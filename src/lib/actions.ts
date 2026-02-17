@@ -59,7 +59,7 @@ export async function register(prevState: string | undefined, formData: FormData
 
     // Admin Registration Restriction
     if (role === "ADMIN") {
-        if (email !== "tachikawa.loohcs@gmail.com") {
+        if (email !== "tachikawa@loohcs.co.jp") {
             return "このメールアドレスでは管理者登録できません";
         }
         if (password !== "Yamamoto_Hasegawa2525") {
@@ -112,26 +112,28 @@ export async function completeProfile(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
     const bio = formData.get("bio") as string;
     const role = formData.get("role") as string;
+    const campus = formData.get("campus") as string;
 
     if (!name) return "名前を入力してください";
 
     try {
-        await prisma.user.update({
+        const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
             data: {
                 name,
                 bio: role === "INSTRUCTOR" ? (bio || null) : null,
                 role: (role === "INSTRUCTOR" || role === "STUDENT") ? role : undefined,
+                campus: campus || null,
                 isProfileComplete: true
-            }
+            } as any
         });
+
+        // Return the role so client can redirect appropriately
+        return { success: true, role: updatedUser.role };
     } catch (error) {
         console.error("Profile complete error:", error);
         return "データベースエラーが発生しました";
     }
-
-    // Auth session needs refresh, but redirecting to dashboard usually works as middleware picks it up
-    return "success";
 }
 
 export async function logout() {

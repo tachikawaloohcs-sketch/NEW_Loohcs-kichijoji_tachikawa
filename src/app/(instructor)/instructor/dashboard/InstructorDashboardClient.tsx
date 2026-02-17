@@ -4,7 +4,7 @@ import { useState, useTransition, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar, CalendarDayButton } from "@/components/ui/calendar";
 import { format, isSameDay } from "date-fns";
 import { ja } from "date-fns/locale";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
-import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport, forceBookStudent, addInstructorToShift } from "./actions";
+import { createShift, submitReport, approveRequest, rejectRequest, deleteShift, updateAdmissionResult, updateStudentProfile, updateReport, forceBookStudent, addInstructorToShift, toggleShiftPublish } from "./actions";
 
 type ShiftType = "individual" | "group" | "special" | "beginner" | "trial";
 
@@ -43,6 +43,7 @@ interface Shift {
     bookings: Booking[];
     shiftInstructors?: { instructor: { name: string | null } }[];
     maxCapacity?: number | null;
+    isPublished: boolean;
 }
 
 interface Request {
@@ -144,6 +145,7 @@ export default function InstructorDashboardClient({
     const [classNameInput, setClassNameInput] = useState("");
     const [maxCapacity, setMaxCapacity] = useState<string>(""); // Empty = unlimited
     const [additionalInstructors, setAdditionalInstructors] = useState<string[]>([]); // Instructor IDs
+    const [isPublishedInput, setIsPublishedInput] = useState(true);
 
     // Instructor assignment dialog
     const [isAddInstructorDialogOpen, setIsAddInstructorDialogOpen] = useState(false);
@@ -176,9 +178,10 @@ export default function InstructorDashboardClient({
         formData.append("startTime", startTime);
         formData.append("endTime", endTime);
         formData.append("type", shiftType);
-        formData.append("location", location);
+        if (location) formData.append("location", location);
         if (classNameInput) formData.append("className", classNameInput);
         if (maxCapacity) formData.append("maxCapacity", maxCapacity);
+        formData.append("isPublished", String(isPublishedInput));
         if (additionalInstructors.length > 0) formData.append("additionalInstructors", JSON.stringify(additionalInstructors));
 
         startTransition(async () => {
@@ -219,26 +222,53 @@ export default function InstructorDashboardClient({
         );
     }, [currentShifts]);
 
-    // Calculate dates with unsubmitted reports
-    const unsubmittedDates = useMemo(() => {
+    // Calculate calendar status for each day
+    const calendarStatus = useMemo(() => {
+        const stats: Record<string, {
+            hasShift: boolean;
+            isFull: boolean;
+            hasDraft: boolean;
+            needsReport: boolean;
+        }> = {};
+
         const now = new Date();
-        const dates: Date[] = [];
+
         currentShifts.forEach(shift => {
-            const shiftStart = new Date(shift.start);
-            // Only consider past shifts or started shifts
-            if (shiftStart < now) {
-                shift.bookings.forEach(booking => {
-                    if ((booking.status === "CONFIRMED" || booking.status === "confirmed") && !booking.report) {
-                        // Normalize to start of day for Calendar matching
-                        const d = new Date(shiftStart);
-                        d.setHours(0, 0, 0, 0);
-                        dates.push(d);
-                    }
-                });
+            const dateKey = format(shift.start, "yyyy-MM-dd");
+            if (!stats[dateKey]) {
+                stats[dateKey] = { hasShift: false, isFull: false, hasDraft: false, needsReport: false };
+            }
+
+            stats[dateKey].hasShift = true;
+            if (!shift.isPublished) stats[dateKey].hasDraft = true;
+
+            const confirmedBookings = shift.bookings.filter(b => b.status === 'CONFIRMED' || b.status === "confirmed");
+            const isIndividual = shift.type === "INDIVIDUAL";
+            const isFull = isIndividual ? confirmedBookings.length > 0 : (shift.maxCapacity ? confirmedBookings.length >= shift.maxCapacity : false);
+
+            if (isFull) stats[dateKey].isFull = true;
+
+            // Check if needs report (past shift with confirmed booking and no report)
+            if (new Date(shift.start) < now) {
+                const needsReport = confirmedBookings.some(b => !b.report);
+                if (needsReport) stats[dateKey].needsReport = true;
             }
         });
-        return dates;
+
+        return stats;
     }, [currentShifts]);
+
+    const unsubmittedDates = useMemo(() => {
+        return Object.entries(calendarStatus)
+            .filter(([_, status]) => status.needsReport)
+            .map(([dateKey, _]) => new Date(dateKey));
+    }, [calendarStatus]);
+
+    const shiftDates = useMemo(() => {
+        return Object.entries(calendarStatus)
+            .filter(([_, status]) => status.hasShift)
+            .map(([dateKey, _]) => new Date(dateKey));
+    }, [calendarStatus]);
 
     const openReportDialog = (bookingId: string, existingReport?: Report | null) => {
         setSelectedBookingId(bookingId);
@@ -374,17 +404,65 @@ export default function InstructorDashboardClient({
                             </CardHeader>
                             <CardContent className="flex flex-col md:flex-row gap-8">
                                 <div className="flex-1">
-                                    <Calendar
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={handleDateSelect}
-                                        className="rounded-md border shadow mx-auto"
-                                        modifiers={{ unsubmitted: unsubmittedDates }}
-                                        modifiersClassNames={{
-                                            unsubmitted: "bg-red-100 text-red-600 font-bold border-2 border-red-500 rounded-full"
-                                        }}
+                                    <div className="relative">
+                                        <Calendar
+                                            mode="single"
+                                            selected={date}
+                                            onSelect={handleDateSelect}
+                                            className="rounded-md border shadow mx-auto"
+                                            modifiers={{
+                                                unsubmitted: unsubmittedDates,
+                                                hasShift: shiftDates
+                                            }}
+                                            modifiersClassNames={{
+                                                unsubmitted: "border-red-500",
+                                                hasShift: "font-bold"
+                                            }}
+                                            components={{
+                                                DayButton: (props) => {
+                                                    const dateKey = format(props.day.date, "yyyy-MM-dd");
+                                                    const status = calendarStatus[dateKey];
 
-                                    />
+                                                    return (
+                                                        <div className="relative group/day w-full h-full flex flex-col items-center justify-center">
+                                                            <CalendarDayButton {...props} />
+                                                            {status && (
+                                                                <div className="absolute bottom-1 flex gap-0.5 justify-center w-full">
+                                                                    {status.hasDraft && (
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400" title="下書きあり" />
+                                                                    )}
+                                                                    {status.hasShift && (
+                                                                        <div className={`w-1.5 h-1.5 rounded-full ${status.isFull ? 'bg-blue-600' : 'bg-green-500'}`} title={status.isFull ? '予約満員' : '空き枠あり'} />
+                                                                    )}
+                                                                    {status.needsReport && (
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" title="カルテ提出漏れ" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="mt-4 grid grid-cols-2 gap-2 text-[10px] text-muted-foreground px-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-green-500" />
+                                            <span>空き枠あり</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-blue-600" />
+                                            <span>予約満員</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                            <span>下書きあり</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full bg-red-600" />
+                                            <span>カルテ提出漏れ</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="flex-1 space-y-4">
                                     <h3 className="font-semibold text-lg border-b pb-2">
@@ -403,6 +481,9 @@ export default function InstructorDashboardClient({
                                                                 {shift.type === "INDIVIDUAL" ? "個別" : shift.type === "GROUP" ? "集団" : shift.type === "BEGINNER" ? "ビギナー" : shift.type === "TRIAL" ? "無料体験" : "特別"}
                                                             </Badge>
                                                             <span className="font-mono text-sm">{formatTime(shift.start)} - {formatTime(shift.end)}</span>
+                                                            <Badge variant={shift.isPublished ? "outline" : "secondary"} className={shift.isPublished ? "text-green-600 border-green-200" : "text-amber-600 border-amber-200"}>
+                                                                {shift.isPublished ? "公開中" : "下書き"}
+                                                            </Badge>
                                                         </div>
                                                         <span className="text-xs text-muted-foreground">{getLocationLabel(shift.location)}</span>
                                                     </div>
@@ -490,30 +571,54 @@ export default function InstructorDashboardClient({
                                                                 </Button>
                                                             )}
 
-                                                            {/* Delete Button */}
-                                                            {new Date(shift.start).getTime() - new Date().getTime() > 24 * 60 * 60 * 1000 && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                    onClick={() => {
-                                                                        const hasBooking = shift.bookings.some(b => b.status === 'CONFIRMED');
-                                                                        const message = hasBooking
-                                                                            ? "このシフトには予約が入っています。\n削除すると予約もキャンセルされます。\n本当に削除しますか？"
-                                                                            : "このシフトを削除しますか？";
+                                                            {/* Toggle Publish Button */}
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className={`h-6 text-xs ${shift.isPublished ? 'text-amber-500' : 'text-green-500'}`}
+                                                                onClick={() => {
+                                                                    startTransition(async () => {
+                                                                        const res = await toggleShiftPublish(shift.id);
+                                                                        if (!res.success) alert(res.error);
+                                                                        else window.location.reload();
+                                                                    });
+                                                                }}
+                                                                disabled={isPending}
+                                                            >
+                                                                {shift.isPublished ? "非公開にする" : "公開する"}
+                                                            </Button>
 
-                                                                        if (confirm(message)) {
-                                                                            startTransition(async () => {
-                                                                                const res = await deleteShift(shift.id);
-                                                                                if (!res.success) alert(res.error);
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    disabled={isPending}
-                                                                >
-                                                                    削除
-                                                                </Button>
-                                                            )}
+                                                            {/* Delete Button */}
+                                                            {(() => {
+                                                                const hasConfirmedBooking = shift.bookings.some(b => b.status === 'CONFIRMED' || b.status === "confirmed");
+                                                                const isWithin24h = new Date(shift.start).getTime() - new Date().getTime() < 24 * 60 * 60 * 1000;
+                                                                const canDelete = !hasConfirmedBooking || !isWithin24h;
+
+                                                                if (!canDelete) return null;
+
+                                                                return (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-6 text-xs text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                                        onClick={() => {
+                                                                            const message = hasConfirmedBooking
+                                                                                ? "このシフトには予約が入っています。\n削除すると予約もキャンセルされます。\n本当に削除しますか？"
+                                                                                : "このシフトを削除しますか？";
+
+                                                                            if (confirm(message)) {
+                                                                                startTransition(async () => {
+                                                                                    const res = await deleteShift(shift.id);
+                                                                                    if (!res.success) alert(res.error);
+                                                                                });
+                                                                            }
+                                                                        }}
+                                                                        disabled={isPending}
+                                                                    >
+                                                                        削除
+                                                                    </Button>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -638,6 +743,19 @@ export default function InstructorDashboardClient({
                                         />
                                     </div>
                                 )}
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label className="text-right">即時公開</Label>
+                                    <div className="flex items-center space-x-2 col-span-3">
+                                        <input
+                                            type="checkbox"
+                                            id="isPublished"
+                                            checked={isPublishedInput}
+                                            onChange={(e) => setIsPublishedInput(e.target.checked)}
+                                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                                        />
+                                        <Label htmlFor="isPublished" className="text-xs font-normal">チェックを入れると生徒に公開されます</Label>
+                                    </div>
+                                </div>
                             </div>
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>キャンセル</Button>
@@ -774,150 +892,6 @@ export default function InstructorDashboardClient({
                 </TabsContent>
             </Tabs>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>シフトを追加</DialogTitle>
-                        <DialogDescription>
-                            {date && format(date, "yyyy年M月d日", { locale: ja })} のシフト詳細を入力してください。
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">時間</Label>
-                            <div className="col-span-3 flex gap-2 items-center">
-                                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
-                                <span>~</span>
-                                <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-24" min="07:00" max="22:00" step="600" />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">場所</Label>
-                            <Select value={location} onValueChange={setLocation}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="ONLINE">オンライン</SelectItem>
-                                    <SelectItem value="KICHIJOJI">吉祥寺校舎</SelectItem>
-                                    <SelectItem value="TACHIKAWA">立川校舎</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label className="text-right">種別</Label>
-                            <Select value={shiftType} onValueChange={(val: ShiftType) => setShiftType(val)}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="individual">個別指導</SelectItem>
-                                    <SelectItem value="group">集団授業</SelectItem>
-                                    <SelectItem value="beginner">ビギナー</SelectItem>
-                                    <SelectItem value="trial">無料体験</SelectItem>
-                                    <SelectItem value="special">特別パック</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {shiftType !== "individual" && (
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">授業名</Label>
-                                <Input
-                                    value={classNameInput}
-                                    onChange={(e) => setClassNameInput(e.target.value)}
-                                    placeholder="例: 中3英語特訓"
-                                    className="col-span-3"
-                                />
-                            </div>
-                        )}
-                        {(shiftType === "group" || shiftType === "special") && (
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">最大定員</Label>
-                                <Input
-                                    type="number"
-                                    value={maxCapacity}
-                                    onChange={(e) => setMaxCapacity(e.target.value)}
-                                    placeholder="空欄=無制限"
-                                    className="col-span-3"
-                                    min="1"
-                                />
-                            </div>
-                        )}
-                        {(shiftType === "group" || shiftType === "special") && (
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label className="text-right">追加講師</Label>
-                                <div className="col-span-3 space-y-2">
-                                    <p className="text-sm text-muted-foreground">集団授業の共同担当講師を選択（複数可）</p>
-                                    {instructors.filter(i => i.id !== currentUser?.id).map((instructor) => (
-                                        <div key={instructor.id} className="flex items-center space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                id={`instructor-${instructor.id}`}
-                                                checked={additionalInstructors.includes(instructor.id)}
-                                                onChange={(e) => {
-                                                    if (e.target.checked) {
-                                                        setAdditionalInstructors([...additionalInstructors, instructor.id]);
-                                                    } else {
-                                                        setAdditionalInstructors(additionalInstructors.filter(id => id !== instructor.id));
-                                                    }
-                                                }}
-                                                className="rounded border-gray-300"
-                                            />
-                                            <label htmlFor={`instructor-${instructor.id}`} className="text-sm cursor-pointer">
-                                                {instructor.name || instructor.email}
-                                            </label>
-                                        </div>
-                                    ))}
-                                    {instructors.filter(i => i.id !== currentUser?.id).length === 0 && (
-                                        <p className="text-sm text-muted-foreground">他の講師が登録されていません</p>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsDialogOpen(false)}>キャンセル</Button>
-                        <Button onClick={handleCreateShift} disabled={isPending}>公開する</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Report Dialog */}
-            <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-                <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                        <DialogTitle>授業カルテの入力</DialogTitle>
-                        <DialogDescription>
-                            本日の授業の報告を行ってください。
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form action={handleSubmitReport}>
-                        <div className="grid gap-4 py-4">
-                            <div className="space-y-2">
-                                <Label>本日の実施内容（所感含む正直な記録）</Label>
-                                <Textarea name="content" required placeholder="授業内容と生徒の様子..." className="h-24" defaultValue={reportDefaults?.content || ""} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>該当ログURL</Label>
-                                <Input name="logUrl" placeholder="https://..." defaultValue={reportDefaults?.logUrl || ""} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>宿題</Label>
-                                <Input name="homework" placeholder="P.24-25, 単語テスト" defaultValue={reportDefaults?.homework || ""} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>生徒への申し送り事項</Label>
-                                <Textarea name="feedback" placeholder="次回までに復習しておくこと..." defaultValue={reportDefaults?.feedback || ""} />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" type="button" onClick={() => setIsReportDialogOpen(false)}>キャンセル</Button>
-                            <Button type="submit" disabled={isPending}>提出する</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
             {/* Force Booking Dialog */}
             <Dialog open={showForceBookDialog} onOpenChange={setShowForceBookDialog}>
                 <DialogContent>
@@ -1003,8 +977,6 @@ export default function InstructorDashboardClient({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
         </div>
-
     );
 }

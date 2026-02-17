@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
         // 1. Get a valid user ID to backfill (The admin we just fixed)
         const admin = await prisma.user.findUnique({
-            where: { email: 'tachikawa.loohcs@gmail.com' }
+            where: { email: 'tachikawa@loohcs.co.jp' }
         });
 
         if (!admin) {

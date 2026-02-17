@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        const email = 'tachikawa.loohcs@gmail.com';
+        const email = 'tachikawa@loohcs.co.jp';
         const user = await prisma.user.update({
             where: { email },
             data: { role: 'ADMIN' }

@@ -3,7 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { format } from "date-fns";
+import { format, startOfDay, subDays, isBefore } from "date-fns";
 import { ja } from "date-fns/locale";
 
 // Mock Email Function
@@ -76,18 +76,20 @@ export async function createBooking(shiftId: string, meetingType: string = "ONLI
 
     const shift = await prisma.shift.findUnique({
         where: { id: shiftId },
-        include: { instructor: true }
+        include: {
+            instructor: true,
+            shiftInstructors: { include: { instructor: true } }
+        }
     });
 
     if (!shift) return { error: "Shift not found" };
 
     const now = new Date();
-    const shiftStart = new Date(shift.start);
-    const timeDiff = shiftStart.getTime() - now.getTime();
-    const hoursUntilStart = timeDiff / (1000 * 60 * 60);
+    const lessonDate = startOfDay(new Date(shift.start));
+    const deadline = subDays(lessonDate, 1); // 0:00 of the day before
 
-    if (hoursUntilStart < 24) {
-        return { error: "予約期限切れです（授業開始24時間前まで予約可能）" };
+    if (isBefore(deadline, now)) {
+        return { error: "予約期限切れです（授業日前日の0:00まで予約可能）" };
     }
 
     // Check booking availability based on shift type
@@ -150,27 +152,88 @@ export async function createBooking(shiftId: string, meetingType: string = "ONLI
 
         const typeText = shift.type === 'INDIVIDUAL' ? '個別指導' : shift.type === 'GROUP' ? '集団授業' : '特別授業';
 
-        const body = `${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。\nキャンセルは授業1日前までできます。`;
-
-        // To Student
-        // To Student
         const student = await prisma.user.findUnique({ where: { id: session.user.id } });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if ((student as any)?.lineUserId) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await sendLineMessage((student as any).lineUserId, body);
+        const studentName = (student as any)?.name || "生徒";
+        const studentBody = `${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。\nキャンセルは授業1日前までできます。`;
+        const instructorBody = `${dateStr} ${timeStr} ${locationText} ${typeText} ${studentName} さん\n予約が確定しました。`;
+
+        // Unique recipients
+        const recipients = new Map<string, string>();
+        if ((student as any).lineUserId) recipients.set((student as any).lineUserId, studentBody);
+
+        const allInstructors = [shift.instructor, ...(shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
+        for (const inst of allInstructors) {
+            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
         }
 
-        // To Instructor
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const instructor = shift.instructor as any;
-        if (instructor.lineUserId) {
-            await sendLineMessage(instructor.lineUserId, body);
+        for (const [lineId, msg] of recipients) {
+            await sendLineMessage(lineId, msg);
         }
 
         revalidatePath("/student/dashboard");
         return { success: true, booking };
     } catch {
+        return { error: "Database error" };
+    }
+}
+
+export async function cancelBooking(bookingId: string) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "STUDENT") {
+        return { error: "Unauthorized" };
+    }
+
+    const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        include: {
+            shift: {
+                include: {
+                    instructor: true,
+                    shiftInstructors: { include: { instructor: true } }
+                }
+            },
+            student: true
+        }
+    });
+
+    if (!booking) return { error: "Booking not found" };
+    if (booking.studentId !== session.user.id) return { error: "Unauthorized" };
+
+    const now = new Date();
+    const lessonDate = startOfDay(new Date(booking.shift.start));
+    const deadline = subDays(lessonDate, 1); // 0:00 of the day before
+
+    if (isBefore(deadline, now)) {
+        return { error: "キャンセル期限切れです（授業日前日の0:00までキャンセル可能）" };
+    }
+
+    try {
+        await prisma.booking.delete({
+            where: { id: bookingId }
+        });
+
+        const dateStr = format(booking.shift.start, "MM/dd", { locale: ja });
+        const timeStr = `${format(booking.shift.start, "HH:mm", { locale: ja })} - ${format(booking.shift.end, "HH:mm", { locale: ja })}`;
+        const studentBody = `【キャンセル通知】\n${dateStr} ${timeStr} の授業予約がキャンセルされました。\n講師: ${booking.shift.instructor.name}`;
+        const instructorBody = `【キャンセル通知】\n${dateStr} ${timeStr} の授業予約がキャンセルされました。\n生徒: ${booking.student.name}`;
+
+        // Unique recipients
+        const recipients = new Map<string, string>();
+        if ((booking.student as any).lineUserId) recipients.set((booking.student as any).lineUserId, studentBody);
+
+        const allInstructors = [booking.shift.instructor, ...(booking.shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
+        for (const inst of allInstructors) {
+            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
+        }
+
+        for (const [lineId, msg] of recipients) {
+            await sendLineMessage(lineId, msg);
+        }
+
+        revalidatePath("/student/dashboard");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
         return { error: "Database error" };
     }
 }
@@ -254,8 +317,21 @@ export async function createRequest(instructorId: string, date: Date, startTime:
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const instructor = reqAny.instructor as any;
+        console.log(`[Request Created] Student: ${reqAny.student.name}, Instructor: ${instructor.name}, Instructor LINE ID: ${instructor.lineUserId || 'NOT SET'}`);
         if (instructor.lineUserId) {
             await sendLineMessage(instructor.lineUserId, body);
+        } else {
+            console.warn(`[Request Notification Skipped] Instructor ${instructor.name} has no LINE ID`);
+        }
+
+        // Notify Student (Newly added)
+        const student = await prisma.user.findUnique({ where: { id: session.user.id } });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        console.log(`[Request Created] Student LINE ID: ${(student as any)?.lineUserId || 'NOT SET'}`);
+        if ((student as any)?.lineUserId) {
+            await sendLineMessage((student as any).lineUserId, `【リクエスト送信完了】\n${dateStr} ${timeStr} の日程リクエストを ${reqAny.instructor.name} 講師に送信しました。`);
+        } else {
+            console.warn(`[Request Notification Skipped] Student ${reqAny.student.name} has no LINE ID`);
         }
 
         revalidatePath("/student/dashboard");

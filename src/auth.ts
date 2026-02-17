@@ -11,7 +11,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         Line({
             clientId: process.env.NEXT_PUBLIC_LINE_LOGIN_ID,
             clientSecret: process.env.LINE_LOGIN_SECRET,
-            authorization: { params: { scope: "profile openid" } },
+            authorization: { params: { scope: "profile openid email" } },
         }),
         Credentials({
             async authorize(credentials) {
@@ -40,7 +40,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                 }
 
                 // Admin Login Restriction
-                if (user.role === "ADMIN" && user.email !== "tachikawa.loohcs@gmail.com") {
+                if (user.role === "ADMIN" && user.email !== "tachikawa@loohcs.co.jp") {
                     console.log("Unauthorized admin login attempt");
                     return null;
                 }
@@ -72,30 +72,80 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
             if (account?.provider === "line") {
                 const lineUserId = profile?.sub as string;
                 if (!lineUserId) return false;
+                const email = (profile as any)?.email as string | undefined;
 
-                // Find user by LINE ID
-                let dbUser = await prisma.user.findUnique({
+                // 1. Find user by LINE ID first
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let dbUser = await (prisma.user as any).findFirst({
                     where: { lineUserId: lineUserId }
                 });
 
+                // 2. If not found by LINE ID, try to find by email and link
+                if (!dbUser && email) {
+                    dbUser = await prisma.user.findUnique({ where: { email } });
+                    if (dbUser) {
+                        console.log(`[LINE Login] Linking existing ${dbUser.role} account (${email}) with LINE ID: ${lineUserId}`);
+                        // Link existing user - preserve their role (STUDENT, INSTRUCTOR, or ADMIN)
+                        await prisma.user.update({
+                            where: { id: dbUser.id },
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            data: {
+                                lineUserId: lineUserId,
+                                name: (profile as any)?.name || dbUser.name,
+                                imageUrl: (profile as any)?.picture || dbUser.imageUrl,
+                            } as any
+                        });
+                        console.log(`[LINE Login] Successfully linked ${dbUser.role} account with LINE notifications enabled`);
+                    }
+                }
+
+                // 3. If still not found, create new user as STUDENT
                 if (!dbUser) {
-                    // Auto-create as STUDENT if not found
+                    console.log(`[LINE Login] Creating new STUDENT account for LINE ID: ${lineUserId}`);
                     dbUser = await prisma.user.create({
                         data: {
-                            lineUserId: lineUserId,
-                            name: profile?.name as string || user.name,
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            lineUserId: lineUserId as any,
+                            name: (profile as any)?.name || user.name || "新規ユーザー",
+                            email: email,
                             imageUrl: (profile as any)?.picture || user.image,
                             role: "STUDENT",
                             isActive: true,
                             isProfileComplete: false,
+                        } as any
+                    });
+                } else if (dbUser.lineUserId === lineUserId) {
+                    // User already linked, just update profile info if needed
+                    await prisma.user.update({
+                        where: { id: dbUser.id },
+                        data: {
+                            name: (profile as any)?.name || dbUser.name,
+                            imageUrl: (profile as any)?.picture || dbUser.imageUrl,
                         }
                     });
+                }
+
+                if (!dbUser) return false;
+
+                // Check if user is active
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if (Object.prototype.hasOwnProperty.call(dbUser, 'isActive') && !(dbUser as any).isActive) {
+                    console.log(`[LINE Login] User account is inactive: ${dbUser.email}`);
+                    return false;
+                }
+
+                // Check if user is archived
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if ((dbUser as any).archivedAt) {
+                    console.log(`[LINE Login] User account is archived: ${dbUser.email}`);
+                    return false;
                 }
 
                 // Set database info to user object so JWT callback can pick it up
                 (user as any).id = dbUser.id;
                 (user as any).role = dbUser.role;
                 (user as any).isProfileComplete = dbUser.isProfileComplete;
+                console.log(`[LINE Login] Successful login as ${dbUser.role}: ${dbUser.email || dbUser.name}`);
                 return true;
             }
             return true; // Allow credentials

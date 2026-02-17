@@ -3,6 +3,10 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
+import { sendLineMessage } from "@/lib/line";
 
 // ユーザー管理: 全ユーザー取得
 export async function getUsers() {
@@ -318,7 +322,11 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
 
     const shift = await prisma.shift.findUnique({
         where: { id: shiftId },
-        include: { bookings: { where: { status: "CONFIRMED" } } }
+        include: {
+            bookings: { where: { status: "CONFIRMED" } },
+            instructor: true,
+            shiftInstructors: { include: { instructor: true } }
+        }
     });
 
     if (!shift) return { error: "Shift not found" };
@@ -326,6 +334,12 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
     if (shift.type === "INDIVIDUAL" && shift.bookings.length > 0) {
         return { error: "既に予約が入っています" };
     }
+
+    const student = await prisma.user.findUnique({
+        where: { id: studentId }
+    });
+
+    if (!student) return { error: "Student not found" };
 
     try {
         await prisma.booking.create({
@@ -336,9 +350,36 @@ export async function adminCreateBooking(shiftId: string, studentId: string) {
                 meetingType: "ONLINE"
             }
         });
+
+        // LINE Notification
+        const dateStr = format(shift.start, "MM/dd", { locale: ja });
+        const timeStr = `${format(shift.start, "HH:mm", { locale: ja })} - ${format(shift.end, "HH:mm", { locale: ja })}`;
+        const locationText = shift.location === 'ONLINE' ? 'オンライン' :
+            shift.location === 'TACHIKAWA' ? '立川校舎' :
+                shift.location === 'KICHIJOJI' ? '吉祥寺校舎' : 'オンライン';
+        const typeText = shift.type === 'INDIVIDUAL' ? '個別指導' : shift.type === "GROUP" ? "集団授業" : "特別授業";
+
+        const studentName = (student as any)?.name || "生徒";
+        const studentBody = `【予約確定通知（管理者代行）】\n${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。`;
+        const instructorBody = `【予約確定通知（管理者代行）】\n${dateStr} ${timeStr} ${locationText} ${typeText} ${studentName} さん\n予約が確定しました。`;
+
+        // Unique recipients
+        const recipients = new Map<string, string>();
+        if ((student as any).lineUserId) recipients.set((student as any).lineUserId, studentBody);
+
+        const allInstructors = [shift.instructor, ...(shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
+        for (const inst of allInstructors) {
+            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
+        }
+
+        for (const [lineId, msg] of recipients) {
+            await sendLineMessage(lineId, msg);
+        }
+
         revalidatePath("/admin/dashboard");
         return { success: true };
     } catch (e) {
+        console.error(e);
         return { error: "予約作成に失敗しました" };
     }
 }
@@ -450,5 +491,93 @@ export async function updateAdmissionResults(studentId: string, results: any[]) 
     } catch (e) {
         console.error(e);
         return { error: "更新に失敗しました" };
+    }
+}
+
+export async function permanentDeleteUser(userId: string, passwordConfirm: string) {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "ADMIN") return { error: "Unauthorized" };
+
+    if (userId === session.user.id) {
+        return { error: "自分自身を削除することはできません" };
+    }
+
+    try {
+        // 1. Verify Admin Password
+        const admin = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { password: true }
+        });
+
+        if (!admin || !admin.password) return { error: "管理者認証に失敗しました" };
+
+        const isMatch = await bcrypt.compare(passwordConfirm, admin.password);
+        if (!isMatch) return { error: "管理者パスワードが正しくありません" };
+
+        // 2. Comprehensive Hard Delete
+        await prisma.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({ where: { id: userId } });
+            if (!user) throw new Error("User not found");
+
+            // Common for both roles
+            await tx.admissionResult.deleteMany({ where: { studentId: userId } });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (tx as any).archiveAccess.deleteMany({
+                where: { OR: [{ studentId: userId }, { instructorId: userId }] }
+            });
+
+            if (user.role === "INSTRUCTOR") {
+                // Delete everything related to shifts
+                const shifts = await tx.shift.findMany({ where: { instructorId: userId }, select: { id: true } });
+                const shiftIds = shifts.map(s => s.id);
+
+                if (shiftIds.length > 0) {
+                    const bookings = await tx.booking.findMany({ where: { shiftId: { in: shiftIds } }, select: { id: true } });
+                    const bookingIds = bookings.map(b => b.id);
+                    if (bookingIds.length > 0) {
+                        await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                    }
+                    await tx.booking.deleteMany({ where: { shiftId: { in: shiftIds } } });
+                    await tx.shiftInstructor.deleteMany({ where: { shiftId: { in: shiftIds } } });
+                    await tx.shift.deleteMany({ where: { instructorId: userId } });
+                }
+                await tx.scheduleRequest.deleteMany({ where: { instructorId: userId } });
+            } else {
+                // Delete everything related to student bookings
+                const bookings = await tx.booking.findMany({ where: { studentId: userId }, select: { id: true } });
+                const bookingIds = bookings.map(b => b.id);
+                if (bookingIds.length > 0) {
+                    await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
+                }
+                await tx.booking.deleteMany({ where: { studentId: userId } });
+                await tx.scheduleRequest.deleteMany({ where: { studentId: userId } });
+            }
+
+            // Finally delete the user
+            await tx.user.delete({ where: { id: userId } });
+        });
+
+        revalidatePath("/admin/dashboard");
+        return { success: true, message: "データを完全に削除しました" };
+    } catch (e) {
+        console.error(e);
+        return { error: "完全削除に失敗しました" };
+    }
+}
+
+export async function updateLineUserId(userId: string, lineUserId: string) {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+    try {
+        await prisma.user.update({
+            where: { id: userId },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            data: { lineUserId } as any
+        });
+        revalidatePath("/admin/dashboard");
+        return { success: true };
+    } catch (e) {
+        return { error: "LINE IDの更新に失敗しました" };
     }
 }

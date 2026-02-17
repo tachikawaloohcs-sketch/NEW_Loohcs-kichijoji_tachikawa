@@ -21,18 +21,21 @@ export default function SetupProfileClient({ user }: { user: User }) {
     const [state, action, isPending] = useActionState(completeProfile, undefined);
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState(user.role || "STUDENT");
+    const [selectedCampus, setSelectedCampus] = useState("TACHIKAWA");
 
     useEffect(() => {
-        if (state === "success") {
-            router.refresh();
-            // Give a small delay for session update
-            setTimeout(() => {
-                if (selectedRole === "ADMIN") router.push("/admin/dashboard");
-                else if (selectedRole === "INSTRUCTOR") router.push("/instructor/dashboard");
-                else router.push("/student/dashboard");
-            }, 500);
+        if (state && typeof state === 'object' && state.success) {
+            // Force a hard redirect to ensure session is refreshed
+            const role = state.role || selectedRole;
+            let redirectUrl = "/student/dashboard";
+
+            if (role === "ADMIN") redirectUrl = "/admin/dashboard";
+            else if (role === "INSTRUCTOR") redirectUrl = "/instructor/dashboard";
+
+            // Use window.location for a hard redirect to ensure session refresh
+            window.location.href = redirectUrl;
         }
-    }, [state, selectedRole, router]);
+    }, [state, selectedRole]);
 
     return (
         <Card className="max-w-md w-full shadow-2xl border-none bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
@@ -68,8 +71,24 @@ export default function SetupProfileClient({ user }: { user: User }) {
                             className="h-11 rounded-lg border-slate-200"
                             required
                         />
-                        <p className="text-[10px] text-muted-foreground">WEBサイト上で他のユーザーに表示される名前です。本名を推奨します。</p>
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            WEBサイト上で表示される名前です。<br />
+                            <span className="text-destructive font-semibold">生徒としての利用時は表示名は確認できないため、必ず本名でお願いします。</span>
+                        </p>
                     </div>
+
+                    {selectedRole === "STUDENT" && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <Label className="text-base font-semibold">所属校舎</Label>
+                            <Tabs defaultValue={selectedCampus} onValueChange={(v) => setSelectedCampus(v)} className="w-full">
+                                <TabsList className="grid grid-cols-2 w-full h-11">
+                                    <TabsTrigger value="TACHIKAWA" className="text-sm">立川校舎</TabsTrigger>
+                                    <TabsTrigger value="KICHIJOJI" className="text-sm">吉祥寺校舎</TabsTrigger>
+                                </TabsList>
+                                <input type="hidden" name="campus" value={selectedCampus} />
+                            </Tabs>
+                        </div>
+                    )}
 
                     {selectedRole === "INSTRUCTOR" && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -84,7 +103,7 @@ export default function SetupProfileClient({ user }: { user: User }) {
                         </div>
                     )}
 
-                    {state && state !== "success" && (
+                    {state && typeof state === 'string' && (
                         <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
                             <p className="text-sm text-destructive font-medium text-center">{state}</p>
                         </div>

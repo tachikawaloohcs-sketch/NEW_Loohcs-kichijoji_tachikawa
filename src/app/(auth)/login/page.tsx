@@ -35,7 +35,12 @@ function LoginForm() {
     useEffect(() => {
         if (isAuto && !isAdminMode) {
             setIsAutoLoggingIn(true);
-            lineLogin();
+            // Use server action for LINE login
+            // This triggers NextAuth's signIn("line") properly
+            lineLogin().catch((error) => {
+                console.error("LINE login error:", error);
+                setIsAutoLoggingIn(false);
+            });
         }
     }, [isAuto, isAdminMode]);
 
@@ -48,7 +53,7 @@ function LoginForm() {
                 </div>
                 <div className="text-center">
                     <h3 className="text-lg font-bold">LINEで自動ログイン中</h3>
-                    <p className="text-sm text-muted-foreground">少々お待ちください...</p>
+                    <p className="text-sm text-muted-foreground">LINEログイン画面に移動しています...</p>
                 </div>
             </div>
         );
