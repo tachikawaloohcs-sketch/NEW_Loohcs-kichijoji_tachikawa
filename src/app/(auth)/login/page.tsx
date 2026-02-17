@@ -99,7 +99,7 @@ function LoginForm() {
                                 className="group flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-primary transition-all"
                             >
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-primary transition-colors" />
-                                管理者・講師の方はこちら
+                                保護者・講師・管理者はこちら
                             </button>
                         </div>
                     </div>
