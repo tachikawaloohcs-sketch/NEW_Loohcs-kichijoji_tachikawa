@@ -57,6 +57,11 @@ model User {
   instructorAccesses ArchiveAccess[]   @relation("InstructorAccess")
   studentAccesses    ArchiveAccess[]   @relation("StudentAccess")
   admissionResults   AdmissionResult[]
+
+  // Parent-Student Relation
+  parentId String?
+  parent   User?   @relation("ParentChildren", fields: [parentId], references: [id])
+  children User[]  @relation("ParentChildren")
 }
 
 model ArchiveAccess {
