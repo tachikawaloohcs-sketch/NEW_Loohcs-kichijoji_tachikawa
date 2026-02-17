@@ -59,7 +59,7 @@ export async function register(prevState: string | undefined, formData: FormData
 
     // Admin Registration Restriction
     if (role === "ADMIN") {
-        if (email !== "tachikawa@loohcs.co.jp") {
+        if (email !== "tachikawa.loohcs@gmail.com") {
             return "このメールアドレスでは管理者登録できません";
         }
         if (password !== "Yamamoto_Hasegawa2525") {

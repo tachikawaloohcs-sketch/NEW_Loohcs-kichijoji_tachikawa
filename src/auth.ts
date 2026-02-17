@@ -40,7 +40,7 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
                 }
 
                 // Admin Login Restriction
-                if (user.role === "ADMIN" && user.email !== "tachikawa@loohcs.co.jp") {
+                if (user.role === "ADMIN" && user.email !== "tachikawa.loohcs@gmail.com") {
                     console.log("Unauthorized admin login attempt");
                     return null;
                 }
