@@ -59,16 +59,26 @@ export async function GET(req: NextRequest) {
                 // Report is tricky if user is student vs instructor. Usually Report links Booking which we just deleted.
 
                 // 講師の場合
-                // Instructor shifts need to be deleted carefully. Cascade might help but let's manual.
+                // Instructor shifts need to be deleted carefully.
                 // Shift has bookings linking to it. Can't delete Shift if bookings exist.
                 // First delete Bookings on instructor's shifts
-                const instructorShifts = await prisma.shift.idMany({ where: { instructorId: user.id } });
-                // Need to import shift? No, just use deleteMany relation
-                /*
-                  Actually, if user is instructor, we must delete all bookings for their shifts first.
-                  This is complex.
-                  Let's try simple delete first, assuming Cascade is set or simple user.
-                */
+                const instructorShifts = await prisma.shift.findMany({
+                    where: { instructorId: user.id },
+                    select: { id: true }
+                });
+
+                const shiftIds = instructorShifts.map(s => s.id);
+                if (shiftIds.length > 0) {
+                    await prisma.booking.deleteMany({
+                        where: { shiftId: { in: shiftIds } }
+                    });
+                    await prisma.shiftInstructor.deleteMany({
+                        where: { shiftId: { in: shiftIds } }
+                    });
+                    await prisma.shift.deleteMany({
+                        where: { instructorId: user.id }
+                    });
+                }
 
                 // Delete user - let's see if it works. If foreign key constraint fails, we catch error.
                 await prisma.user.delete({
