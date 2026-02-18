@@ -34,9 +34,8 @@ export const authConfig: NextAuthConfig = {
             const role = auth?.user?.role;
             const isProfileComplete = (auth?.user as any)?.isProfileComplete;
 
-            if (isLoggedIn && !isProfileComplete && !isOnSetupPage && !nextUrl.pathname.startsWith("/api/auth")) {
-                return Response.redirect(new URL("/setup-profile", nextUrl));
-            }
+            // Removed middleware-level profile check to prevent redirect loops.
+            // Profile completion check should be handled in page components using fresh DB data.
 
             // Dashboard logic
             if (isOnDashboard) {

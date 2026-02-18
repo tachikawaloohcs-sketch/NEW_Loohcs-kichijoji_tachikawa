@@ -1,3 +1,6 @@
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
 import { getInstructors, getStudentBookings } from "./actions";
 import StudentDashboardClient from "./StudentDashboardClient";
 import { Button } from "@/components/ui/button";
@@ -6,6 +9,18 @@ import { logout } from "@/lib/actions";
 export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
+    const session = await auth();
+    if (!session?.user?.id) redirect("/login");
+
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { isProfileComplete: true }
+    });
+
+    if (!user?.isProfileComplete) {
+        redirect("/setup-profile");
+    }
+
     try {
         const [instructors, bookings] = await Promise.all([
             getInstructors(),
