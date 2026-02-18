@@ -25,14 +25,27 @@ export default function ParentDashboardClient({ children }: { children: ChildDat
 
     const activeChild = children.find(c => c.id === selectedChildId) || children[0];
 
+    if (!activeChild) return <div className="p-4">データの読み込みに失敗しました。</div>;
+
+    const safeFormatDate = (date: any, formatStr: string) => {
+        try {
+            if (!date) return "日付不明";
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return "日付不明";
+            return format(d, formatStr, { locale: ja });
+        } catch {
+            return "日付不明";
+        }
+    };
+
     return (
         <div className="space-y-6">
             <h2 className="text-xl font-bold">お子様の学習状況</h2>
 
             <Tabs defaultValue={children[0].id} onValueChange={setSelectedChildId} className="w-full">
-                <TabsList className="mb-4">
+                <TabsList className="mb-4 overflow-x-auto flex flex-nowrap justify-start">
                     {children.map(child => (
-                        <TabsTrigger key={child.id} value={child.id}>
+                        <TabsTrigger key={child.id} value={child.id} className="whitespace-nowrap">
                             {child.name || '未設定'}
                         </TabsTrigger>
                     ))}
@@ -58,13 +71,13 @@ export default function ParentDashboardClient({ children }: { children: ChildDat
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex flex-wrap gap-4">
-                                        {Object.entries(child.stats).map(([type, count]) => (
+                                        {Object.entries(child.stats || {}).map(([type, count]) => (
                                             <div key={type} className="flex flex-col items-center p-3 bg-slate-100 dark:bg-slate-800 rounded-lg min-w-[100px]">
-                                                <span className="text-lg font-bold">{count}</span>
+                                                <span className="text-lg font-bold">{count as number}</span>
                                                 <span className="text-xs text-muted-foreground mt-1">{type}</span>
                                             </div>
                                         ))}
-                                        {Object.keys(child.stats).length === 0 && (
+                                        {Object.keys(child.stats || {}).length === 0 && (
                                             <div className="text-sm text-muted-foreground">データがありません</div>
                                         )}
                                     </div>
@@ -78,13 +91,13 @@ export default function ParentDashboardClient({ children }: { children: ChildDat
                                 <CardTitle>今後の授業予定</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {child.upcoming.length > 0 ? (
+                                {child.upcoming && child.upcoming.length > 0 ? (
                                     <div className="space-y-4">
                                         {child.upcoming.map((u: any) => (
                                             <div key={u.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
                                                 <div>
                                                     <div className="font-semibold">
-                                                        {format(new Date(u.date), 'M月d日(E) H:mm', { locale: ja })}
+                                                        {safeFormatDate(u.date, 'M月d日(E) H:mm')}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">
                                                         {u.type} / {u.instructor}
@@ -106,14 +119,14 @@ export default function ParentDashboardClient({ children }: { children: ChildDat
                                 <CardTitle>授業履歴</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {child.history.length > 0 ? (
+                                {child.history && child.history.length > 0 ? (
                                     <div className="space-y-4">
                                         {child.history.map((h: any) => (
                                             <div key={h.id} className="border-b pb-4 last:border-0 last:pb-0 space-y-2">
                                                 <div className="flex justify-between items-start">
                                                     <div>
                                                         <div className="font-semibold">
-                                                            {format(new Date(h.date), 'yyyy年M月d日(E) H:mm', { locale: ja })}
+                                                            {safeFormatDate(h.date, 'yyyy年M月d日(E) H:mm')}
                                                         </div>
                                                         <div className="text-sm text-muted-foreground">
                                                             {h.type} / {h.instructor}
