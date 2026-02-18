@@ -392,7 +392,7 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
             </Dialog>
 
             <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
-                <DialogContent>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle>日程リクエスト</DialogTitle>
                     </DialogHeader>
@@ -412,33 +412,35 @@ export default function StudentDashboardClient({ instructors, initialBookings }:
                         </div>
                         <div className="space-y-2">
                             <Label>日付</Label>
-                            <div className="flex justify-center border rounded-md p-2">
+                            <div className="flex justify-center border rounded-md p-1 overflow-hidden">
                                 <Calendar
                                     mode="single"
                                     selected={requestDate}
                                     onSelect={setRequestDate}
-                                    className=""
+                                    className="transform scale-90 sm:scale-100 origin-top"
                                 />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label>開始時間</Label>
-                            <Input
-                                type="time"
-                                value={requestTime}
-                                onChange={(e) => setRequestTime(e.target.value)}
-                            />
-                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>開始時間</Label>
+                                <Input
+                                    type="time"
+                                    value={requestTime}
+                                    onChange={(e) => setRequestTime(e.target.value)}
+                                />
+                            </div>
 
-                        <div className="space-y-2">
-                            <Label>終了時間</Label>
-                            <Input
-                                type="time"
-                                value={requestEndTime}
-                                onChange={(e) => setRequestEndTime(e.target.value)}
-                                disabled={requestType === 'GROUP'}
-                                className={requestType === 'GROUP' ? "bg-slate-100" : ""}
-                            />
+                            <div className="space-y-2">
+                                <Label>終了時間</Label>
+                                <Input
+                                    type="time"
+                                    value={requestEndTime}
+                                    onChange={(e) => setRequestEndTime(e.target.value)}
+                                    disabled={requestType === 'GROUP'}
+                                    className={requestType === 'GROUP' ? "bg-slate-100" : ""}
+                                />
+                            </div>
                         </div>
 
                         <div className="space-y-2">
