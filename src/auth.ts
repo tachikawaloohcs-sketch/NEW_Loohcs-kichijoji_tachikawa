@@ -7,11 +7,13 @@ import { authConfig } from "@/auth.config";
 
 export const { auth, signIn, signOut, handlers } = NextAuth({
     ...authConfig,
+    trustHost: true,
     providers: [
         Line({
             clientId: process.env.NEXT_PUBLIC_LINE_LOGIN_ID,
             clientSecret: process.env.LINE_LOGIN_SECRET,
             authorization: { params: { scope: "profile openid email" } },
+            checks: ['state'], // Disable PKCE which might cause issues on some mobile browsers
         }),
         Credentials({
             async authorize(credentials) {
@@ -151,5 +153,21 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
             return true; // Allow credentials
         },
         ...authConfig.callbacks,
+        async jwt({ token, user, trigger, session }) {
+            if (user) {
+                token.role = user.role;
+                token.id = user.id as string;
+                token.isProfileComplete = (user as any).isProfileComplete;
+            }
+
+            if (trigger === "update") {
+                const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
+                if (dbUser) {
+                    token.role = dbUser.role;
+                    token.isProfileComplete = dbUser.isProfileComplete;
+                }
+            }
+            return token;
+        },
     }
 });

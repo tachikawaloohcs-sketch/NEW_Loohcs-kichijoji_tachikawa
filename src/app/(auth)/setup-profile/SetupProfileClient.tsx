@@ -1,5 +1,6 @@
 "use client";
 
+import { useSession } from "next-auth/react";
 import { useActionState, useEffect, useState } from "react";
 import { completeProfile } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,8 @@ interface User {
 }
 
 export default function SetupProfileClient({ user }: { user: User }) {
+    const { update } = useSession();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [state, action, isPending] = useActionState(completeProfile, undefined);
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState(user.role || "STUDENT");
@@ -25,18 +28,20 @@ export default function SetupProfileClient({ user }: { user: User }) {
 
     useEffect(() => {
         if (state && typeof state === 'object' && state.success) {
-            // Force a hard redirect to ensure session is refreshed
-            const role = state.role || selectedRole;
-            let redirectUrl = "/student/dashboard";
+            // Force session update before redirecting
+            update().then(() => {
+                const role = state.role || selectedRole;
+                let redirectUrl = "/student/dashboard";
 
-            if (role === "ADMIN") redirectUrl = "/admin/dashboard";
-            else if (role === "INSTRUCTOR") redirectUrl = "/instructor/dashboard";
+                if (role === "ADMIN") redirectUrl = "/admin/dashboard";
+                else if (role === "INSTRUCTOR") redirectUrl = "/instructor/dashboard";
 
-            // Use router for smoother transition, then refresh to update session
-            router.push(redirectUrl);
-            router.refresh();
+                // Use router for smoother transition, then refresh to update session
+                router.push(redirectUrl);
+                router.refresh();
+            });
         }
-    }, [state, selectedRole]);
+    }, [state, selectedRole, update]);
 
     return (
         <Card className="max-w-md w-full shadow-2xl border-none bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
