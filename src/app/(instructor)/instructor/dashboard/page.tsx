@@ -1,72 +1,43 @@
-import { getInstructorShifts, getInstructorRequests, getStudentsForInstructor, getGlobalSettings, getLicensedArchivedStudents, getAllInstructors } from "./actions";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import InstructorDashboardClient from "./InstructorDashboardClient";
-import { Button } from "@/components/ui/button";
-import { logout } from "@/lib/actions";
-
-import { auth } from "@/auth"; // Import auth
+import { redirect } from "next/navigation";
+import { getStudentsForInstructor, getGlobalSettings, getLicensedArchivedStudents } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function InstructorDashboardPage() {
-    console.log("----------------------------------------------------------------");
-    console.log("SERVER SIDE RENDERING: InstructorDashboardPage START");
-    try {
-        const session = await auth();
-        console.log("Session User:", session?.user?.email);
+    const session = await auth();
+    console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id);
 
-        const [shifts, requests, students, archivedStudents, deadlineSetting, instructors] = await Promise.all([
-            getInstructorShifts(),
-            getInstructorRequests(),
-            getStudentsForInstructor(),
-            getLicensedArchivedStudents(),
-            getGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS"),
-            getAllInstructors()
-        ]);
-        const extensionHours = parseInt(deadlineSetting.value || "0", 10);
-
-        // Sanitize user object to avoid serialization errors
-        const safeUser = session?.user ? {
-            email: session.user.email,
-            role: session.user.role,
-            id: session.user.id
-        } : undefined;
-
-        return (
-            <div className="p-8 space-y-8 max-w-7xl mx-auto">
-                <header className="flex justify-between items-center border-b pb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">講師ダッシュボード</h1>
-                        <p className="text-muted-foreground">シフト管理と生徒カルテ</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <form action={logout}>
-                            <Button variant="outline">ログアウト</Button>
-                        </form>
-                    </div>
-                </header>
-
-                <InstructorDashboardClient
-                    initialShifts={shifts}
-                    initialRequests={requests}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    students={students as any}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    archivedStudents={archivedStudents as any}
-                    deadlineExtensionHours={extensionHours}
-                    currentUser={safeUser}
-                    instructors={instructors}
-                />
-            </div>
-        );
-    } catch (error) {
-        console.error("FATAL ERROR in InstructorDashboardPage:", error);
-        return (
-            <div className="p-8 text-red-500">
-                <h1 className="text-2xl font-bold">システムエラーが発生しました</h1>
-                <pre className="mt-4 p-4 bg-gray-100 rounded text-sm overflow-auto">
-                    {error instanceof Error ? error.message : String(error)}
-                </pre>
-            </div>
-        );
+    if (!session?.user || session.user.role !== "INSTRUCTOR") {
+        redirect("/login");
     }
+
+    const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, role: true, isProfileComplete: true, name: true, email: true, lineUserId: true, bio: true }
+    });
+
+    if (!dbUser || dbUser.role !== "INSTRUCTOR") {
+        const { redirect } = await import("next/navigation");
+        redirect("/api/force-logout");
+    }
+
+    const [allStudents, deadlineSetting, licensedStudents] = await Promise.all([
+        getStudentsForInstructor(),
+        getGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS"),
+        getLicensedArchivedStudents()
+    ]);
+
+    const extensionHours = parseInt(deadlineSetting.value || "0", 10);
+
+    return (
+        <InstructorDashboardClient
+            user={dbUser}
+            allStudents={allStudents as any}
+            initialDeadlineExtension={extensionHours}
+            licensedArchivedStudents={licensedStudents as any}
+        />
+    );
 }

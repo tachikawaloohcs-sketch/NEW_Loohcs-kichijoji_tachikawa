@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,18 +17,12 @@ interface Report {
     homework: string | null;
     feedback: string | null;
     logUrl: string | null;
-    submittedLate: boolean;
+    date: Date | string;
     createdAt: Date | string;
     updatedAt: Date | string;
-}
-
-interface Booking {
-    id: string;
-    shift: {
-        start: Date;
-        instructor: { name: string | null };
+    instructor: {
+        name: string | null;
     };
-    report: Report | null;
 }
 
 interface AdmissionResult {
@@ -43,7 +37,7 @@ interface Student {
     id: string;
     name: string | null;
     email?: string | null;
-    studentBookings: Booking[];
+    studentReports: Report[];
     admissionResults?: AdmissionResult[];
     // Profile Fields
     schoolName?: string | null;
@@ -59,18 +53,31 @@ interface CarteViewerProps {
     students: Student[];
     allInstructors?: { id: string; name: string | null }[]; // For dedicated instructor selection
     editable?: boolean; // If true, allows editing admission results (Instructors/Admins)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    role?: string;
+    loggedInUserId?: string;
     onUpdateAdmission?: (studentId: string, results: any[]) => Promise<{ success?: boolean; error?: string }>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateProfile?: (studentId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdateReport?: (reportId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
 }
 
-export function CarteViewer({ students, allInstructors = [], editable, onUpdateAdmission, onUpdateProfile, onUpdateReport }: CarteViewerProps) {
+export function CarteViewer({ students, allInstructors = [], editable, role, loggedInUserId, onUpdateAdmission, onUpdateProfile, onUpdateReport }: CarteViewerProps) {
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
-    const formatDate = (d: Date) => format(d, "yyyy/MM/dd HH:mm");
+    const formatDate = (d: Date | string) => format(new Date(d), "yyyy/MM/dd HH:mm");
+
+    const [searchQuery, setSearchQuery] = useState("");
+
+    const filteredStudents = useMemo(() => {
+        if (!searchQuery.trim()) return students;
+        const lowerQ = searchQuery.toLowerCase();
+        return students.filter(student => {
+            if (student.name && student.name.toLowerCase().includes(lowerQ)) return true;
+            if (student.schoolName && student.schoolName.toLowerCase().includes(lowerQ)) return true;
+            if (student.researchTheme && student.researchTheme.toLowerCase().includes(lowerQ)) return true;
+            if (student.admissionResults && student.admissionResults.some(ar => ar.schoolName.toLowerCase().includes(lowerQ))) return true;
+            return false;
+        });
+    }, [students, searchQuery]);
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -79,24 +86,32 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                 <CardHeader>
                     <CardTitle>生徒一覧</CardTitle>
                     <CardDescription>生徒を選択して過去のカルテを閲覧</CardDescription>
+                    <div className="mt-4">
+                        <Input
+                            placeholder="名前、志望校、研究テーマで検索"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="w-full"
+                        />
+                    </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {students.length === 0 ? (
-                        <p className="text-muted-foreground">生徒がいません</p>
+                    {filteredStudents.length === 0 ? (
+                        <p className="text-muted-foreground">該当する生徒がいません</p>
                     ) : (
-                        students.map(student => (
+                        filteredStudents.map(student => (
                             <div
                                 key={student.id}
                                 className={`flex items-center gap-4 p-3 rounded cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${selectedStudent?.id === student.id ? 'bg-slate-100 dark:bg-slate-800' : ''}`}
                                 onClick={() => setSelectedStudent(student)}
                             >
-                                <Avatar>
-                                    <AvatarFallback>{student.name?.[0]}</AvatarFallback>
-                                </Avatar>
+                                <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">
+                                    {student.name?.[0]}
+                                </div>
                                 <div>
                                     <div className="font-semibold">{student.name}</div>
                                     <div className="text-xs text-muted-foreground">{student.email || "LINE連携のみ"}</div>
-                                    <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentBookings.length - 1}</div>
+                                    <div className="text-xs text-blue-600 mt-1">カルテ数: {student.studentReports?.length || 0}</div>
                                 </div>
                             </div>
                         ))
@@ -151,67 +166,62 @@ export function CarteViewer({ students, allInstructors = [], editable, onUpdateA
                             </Card>
                         )}
 
-                        {selectedStudent.studentBookings.length === 0 ? (
+                        {!selectedStudent.studentReports || selectedStudent.studentReports.length === 0 ? (
                             <Card>
                                 <CardContent className="p-6 text-center text-muted-foreground">
                                     提出されたカルテはありません。
                                 </CardContent>
                             </Card>
                         ) : (
-                            selectedStudent.studentBookings.map(booking => (
-                                booking.report && (
-                                    <Card key={booking.id}>
-                                        <CardHeader>
-                                            <CardTitle className="text-lg flex justify-between items-center">
-                                                <span>{formatDate(booking.shift.start)}</span>
-                                                <div className="flex items-center gap-2">
-                                                    {booking.report.submittedLate && (
-                                                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">遅延提出</span>
-                                                    )}
-                                                    {(function () {
-                                                        const created = new Date(booking.report!.createdAt);
-                                                        const updated = new Date(booking.report!.updatedAt);
-                                                        if (updated.getTime() - created.getTime() > 60 * 1000) {
-                                                            return <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">編集済</span>;
-                                                        }
-                                                        return null;
-                                                    })()}
-                                                    <span className="text-base font-normal text-muted-foreground">講師: {booking.shift.instructor.name}</span>
-                                                    {editable && onUpdateReport && (
-                                                        <ReportEditDialog
-                                                            report={booking.report}
-                                                            onUpdate={onUpdateReport}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
+                            selectedStudent.studentReports.map(report => (
+                                <Card key={report.id}>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg flex justify-between items-center">
+                                            <span>{formatDate(report.date)}</span>
+                                            <div className="flex items-center gap-2">
+                                                {(function () {
+                                                    const created = new Date(report.createdAt);
+                                                    const updated = new Date(report.updatedAt);
+                                                    if (updated.getTime() - created.getTime() > 60 * 1000) {
+                                                        return <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded">編集済</span>;
+                                                    }
+                                                    return null;
+                                                })()}
+                                                <span className="text-base font-normal text-muted-foreground">講師: {report.instructor.name}</span>
+                                                {editable && onUpdateReport && (
+                                                    <ReportEditDialog
+                                                        report={report}
+                                                        onUpdate={onUpdateReport}
+                                                    />
+                                                )}
+                                            </div>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold text-sm mb-1">実施内容・所感</h4>
+                                            <p className="text-sm bg-slate-50 dark:bg-slate-900 p-3 rounded whitespace-pre-wrap">{report.content}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <h4 className="font-semibold text-sm mb-1">実施内容・所感</h4>
-                                                <p className="text-sm bg-slate-50 dark:bg-slate-900 p-3 rounded whitespace-pre-wrap">{booking.report.content}</p>
+                                                <h4 className="font-semibold text-sm mb-1">宿題</h4>
+                                                <p className="text-sm">{report.homework || "なし"}</p>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <h4 className="font-semibold text-sm mb-1">宿題</h4>
-                                                    <p className="text-sm">{booking.report.homework || "なし"}</p>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-semibold text-sm mb-1">講師への連絡事項</h4>
-                                                    <p className="text-sm">{booking.report.feedback || "なし"}</p>
-                                                </div>
+                                            <div>
+                                                <h4 className="font-semibold text-sm mb-1">講師への連絡事項</h4>
+                                                <p className="text-sm">{report.feedback || "なし"}</p>
                                             </div>
-                                            {booking.report.logUrl && (
-                                                <div>
-                                                    <h4 className="font-semibold text-sm mb-1">ログURL</h4>
-                                                    <a href={booking.report.logUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">
-                                                        {booking.report.logUrl}
-                                                    </a>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                )
+                                        </div>
+                                        {report.logUrl && (
+                                            <div>
+                                                <h4 className="font-semibold text-sm mb-1">ログURL</h4>
+                                                <a href={report.logUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">
+                                                    {report.logUrl}
+                                                </a>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             ))
                         )}
                     </>
@@ -235,7 +245,6 @@ function ProfileInfoCard({
     student: Student;
     allInstructors: { id: string; name: string | null }[];
     editable?: boolean;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onUpdate?: (studentId: string, data: any) => Promise<{ success?: boolean; error?: string }>;
 }) {
     const [isEditing, setIsEditing] = useState(false);
@@ -246,7 +255,7 @@ function ProfileInfoCard({
         gpa: student.gpa?.toString() || "",
         qualifications: student.qualifications || "",
         canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
-        dedicatedInstructorName: student.dedicatedInstructor?.name || ""
+        dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
     });
 
     const handleSave = async () => {
@@ -255,7 +264,7 @@ function ProfileInfoCard({
             ...formData,
             gpa: formData.gpa ? parseFloat(formData.gpa) : null,
             canInternalUpgrade: formData.canInternalUpgrade === "true" ? true : formData.canInternalUpgrade === "false" ? false : null,
-            dedicatedInstructorName: formData.dedicatedInstructorName || null
+            dedicatedInstructorId: formData.dedicatedInstructorId === "None" ? null : formData.dedicatedInstructorId
         };
         await onUpdate(student.id, payload);
         setIsEditing(false);
@@ -269,7 +278,7 @@ function ProfileInfoCard({
             gpa: student.gpa?.toString() || "",
             qualifications: student.qualifications || "",
             canInternalUpgrade: student.canInternalUpgrade !== null ? student.canInternalUpgrade?.toString() : "",
-            dedicatedInstructorName: student.dedicatedInstructor?.name || ""
+            dedicatedInstructorId: student.dedicatedInstructor?.id || "None"
         });
         setIsEditing(false);
     };
@@ -331,7 +340,17 @@ function ProfileInfoCard({
                         </div>
                         <div className="space-y-2">
                             <Label>専任講師</Label>
-                            <Input value={formData.dedicatedInstructorName} onChange={e => setFormData({ ...formData, dedicatedInstructorName: e.target.value })} placeholder="講師名を入力" />
+                            <Select value={formData.dedicatedInstructorId} onValueChange={v => setFormData({ ...formData, dedicatedInstructorId: v })}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="担当なし" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="None">担当なし</SelectItem>
+                                    {allInstructors.map(inst => (
+                                        <SelectItem key={inst.id} value={inst.id}>{inst.name || "名称未設定"}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 ) : (
@@ -465,15 +484,12 @@ function AdmissionStatusBadge({ status }: { status: string }) {
         FAILED: "不合格",
         WITHDRAWN: "辞退",
     };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const style = (styles as any)[status] || styles.PENDING;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const label = (labels as any)[status] || status;
 
     return <span className={`px-2 py-0.5 rounded text-xs ${style}`}>{label}</span>;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function AdmissionEditDialog({ student, onUpdate }: { student: Student, onUpdate: (id: string, results: any[]) => Promise<any> }) {
     const [open, setOpen] = useState(false);
     const [results, setResults] = useState<AdmissionResult[]>(student.admissionResults || []);
@@ -489,7 +505,6 @@ function AdmissionEditDialog({ student, onUpdate }: { student: Student, onUpdate
 
     const updateRow = (index: number, field: keyof AdmissionResult, value: any) => {
         const newResults = [...results];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (newResults[index] as any)[field] = value;
         setResults(newResults);
     };
@@ -570,7 +585,6 @@ function AdmissionEditDialog({ student, onUpdate }: { student: Student, onUpdate
     );
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ProfileEditDialog({ student, allInstructors, onUpdate }: { student: Student, allInstructors: { id: string, name: string | null }[], onUpdate: (id: string, data: any) => Promise<any> }) {
     const [open, setOpen] = useState(false);
     const [formData, setFormData] = useState({

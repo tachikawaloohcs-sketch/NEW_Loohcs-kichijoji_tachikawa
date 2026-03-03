@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Eye, EyeOff } from "lucide-react";
 
 interface User {
     id: string;
@@ -25,6 +26,7 @@ export default function SetupProfileClient({ user }: { user: User }) {
     const router = useRouter();
     const [selectedRole, setSelectedRole] = useState(user.role || "STUDENT");
     const [selectedCampus, setSelectedCampus] = useState("TACHIKAWA");
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (state && typeof state === 'object' && state.success) {
@@ -83,6 +85,8 @@ export default function SetupProfileClient({ user }: { user: User }) {
                         </p>
                     </div>
 
+
+
                     {selectedRole === "STUDENT" && (
                         <>
                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -97,19 +101,37 @@ export default function SetupProfileClient({ user }: { user: User }) {
                             </div>
 
                             <div className="space-y-4 pt-4 border-t animate-in fade-in slide-in-from-top-2 duration-300">
-                                <Label className="text-base font-semibold">保護者情報の登録（推奨）</Label>
+                                <Label className="text-base font-semibold">保護者情報の登録（必須）</Label>
                                 <p className="text-xs text-muted-foreground leading-relaxed">
                                     保護者様用のアカウントを作成・連携します。<br />
                                     登録すると、保護者様も学習状況を確認できるようになります。<br />
-                                    <span className="text-amber-600 font-medium">※未登録の場合は空欄で構いません。</span>
+                                    <span className="text-amber-600 font-medium">※必ず登録してください。</span>
                                 </p>
                                 <div className="space-y-2">
                                     <Label htmlFor="parentEmail" className="text-sm">保護者メールアドレス</Label>
-                                    <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@example.com" className="h-10 rounded-lg" />
+                                    <Input id="parentEmail" name="parentEmail" type="email" placeholder="parent@example.com" className="h-10 rounded-lg" required />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="parentPassword" className="text-sm">保護者パスワード</Label>
-                                    <Input id="parentPassword" name="parentPassword" type="password" placeholder="ログイン用パスワード" className="h-10 rounded-lg" minLength={6} />
+                                    <div className="relative">
+                                        <Input
+                                            id="parentPassword"
+                                            name="parentPassword"
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="ログイン用パスワード"
+                                            className="h-10 rounded-lg pr-10"
+                                            minLength={6}
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                            tabIndex={-1}
+                                        >
+                                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </>
@@ -117,13 +139,14 @@ export default function SetupProfileClient({ user }: { user: User }) {
 
                     {selectedRole === "INSTRUCTOR" && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <Label htmlFor="bio" className="text-base font-semibold">自己紹介・担当科目</Label>
+                            <Label htmlFor="bio" className="text-base font-semibold">自己紹介・担当科目（必須）</Label>
                             <Textarea
                                 id="bio"
                                 name="bio"
                                 defaultValue={user.bio || ""}
                                 placeholder="例: 東大文二所属。英語と数学を担当しています。論理的な思考を一緒に身につけていきましょう。"
                                 className="min-h-[140px] resize-none rounded-lg border-slate-200 p-3"
+                                required
                             />
                         </div>
                     )}

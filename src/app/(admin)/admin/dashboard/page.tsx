@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import AdminDashboardClient from "./AdminDashboardClient";
 import { redirect } from "next/navigation";
-import { getUsers, getAllInstructors, getMasterSchedule, getGlobalSettings } from "./actions";
+import { getUsers, getGlobalSettings } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -11,43 +11,39 @@ export default async function AdminDashboardPage() {
     if (!session?.user || session.user.role !== "ADMIN") {
         redirect("/login");
     }
+    const dbUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { id: true, role: true }
+    });
 
-    // Existing: Fetch all students with reports
-    // Parallelize data fetching
-    const [studentsWithReports, allUsers, allInstructors, masterShifts, deadlineSetting] = await Promise.all([
+    if (!dbUser || dbUser.role !== "ADMIN") {
+        const { redirect } = await import("next/navigation");
+        redirect("/api/force-logout");
+    }
+
+    // Fetch all students with reports directly using studentReports now
+    const [studentsWithReports, allUsers, deadlineSetting] = await Promise.all([
         prisma.user.findMany({
             where: { role: "STUDENT" },
             include: {
-                studentBookings: {
-                    where: {
-                        status: "CONFIRMED",
-                        report: { isNot: null }
-                    },
+                studentReports: {
                     include: {
-                        report: true,
-                        shift: {
-                            include: { instructor: { select: { name: true } } }
-                        }
+                        instructor: { select: { name: true } }
                     },
                     orderBy: {
-                        shift: { start: 'desc' }
+                        date: 'desc'
                     }
                 },
-                // Include profile fields
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 admissionResults: true,
                 dedicatedInstructor: { select: { id: true, name: true } }
             },
             orderBy: { name: 'asc' }
         }),
         getUsers(),
-        getAllInstructors(),
-        getMasterSchedule(),
         getGlobalSettings("CARTE_DEADLINE_EXTENSION_HOURS")
     ]);
 
     const extensionHours = parseInt(deadlineSetting.value || "0", 10);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return <AdminDashboardClient students={studentsWithReports} allUsers={allUsers as any} allInstructors={allInstructors as any} masterShifts={masterShifts as any} initialDeadlineExtension={extensionHours} />;
+    return <AdminDashboardClient students={studentsWithReports} allUsers={allUsers as any} initialDeadlineExtension={extensionHours} />;
 }

@@ -4,9 +4,7 @@ import { auth, signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
-import { writeFile } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
+
 
 export async function authenticate(prevState: string | undefined, formData: FormData) {
     const email = formData.get("email") as string;
@@ -23,13 +21,6 @@ export async function authenticate(prevState: string | undefined, formData: Form
         }
 
         const redirectUrl = "/";
-        // if (user) {
-        //     switch (user.role) {
-        //         case "ADMIN": redirectUrl = "/admin/dashboard"; break;
-        //         case "INSTRUCTOR": redirectUrl = "/instructor/dashboard"; break;
-        //         case "STUDENT": redirectUrl = "/student/dashboard"; break;
-        //     }
-        // }
 
         await signIn("credentials", formData, { redirectTo: redirectUrl });
     } catch (error) {
@@ -41,6 +32,12 @@ export async function authenticate(prevState: string | undefined, formData: Form
                     return "Something went wrong.";
             }
         }
+
+        // Force redirect to "/" to override any callbackUrl behaviors in NextAuth
+        if (error && typeof error === 'object' && 'digest' in error && typeof (error as any).digest === 'string' && (error as any).digest.startsWith('NEXT_REDIRECT')) {
+            const { redirect } = await import("next/navigation");
+            redirect("/");
+        }
         throw error;
     }
 }
@@ -51,7 +48,7 @@ export async function register(prevState: string | undefined, formData: FormData
     const password = formData.get("password") as string;
     const role = formData.get("role") as string; // STUDENT, INSTRUCTOR, ADMIN
     const bio = formData.get("bio") as string;
-    const imageFile = formData.get("image") as File;
+
 
     if (!email || !password || !name) {
         return "Missing fields";
@@ -67,22 +64,6 @@ export async function register(prevState: string | undefined, formData: FormData
         }
     }
 
-    let imageUrl: string | null = null;
-    if (imageFile && imageFile.size > 0) {
-        try {
-            const buffer = Buffer.from(await imageFile.arrayBuffer());
-            const ext = path.extname(imageFile.name) || ".jpg";
-            const fileName = `${randomUUID()}${ext}`;
-            const uploadPath = path.join(process.cwd(), "public/uploads", fileName);
-
-            await writeFile(uploadPath, buffer);
-            imageUrl = `/uploads/${fileName}`;
-        } catch (e) {
-            console.error("Image upload failed", e);
-            // Optionally return error or proceed without image
-        }
-    }
-
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -93,7 +74,6 @@ export async function register(prevState: string | undefined, formData: FormData
                 password: hashedPassword,
                 role: role || "STUDENT",
                 bio: bio || null,
-                imageUrl: imageUrl || null,
                 isProfileComplete: true // Form registration completes it
             },
         });
@@ -114,13 +94,18 @@ export async function completeProfile(prevState: any, formData: FormData) {
     const role = formData.get("role") as string;
     const campus = formData.get("campus") as string;
 
+
     const parentEmail = formData.get("parentEmail") as string;
     const parentPassword = formData.get("parentPassword") as string;
 
     let parentId: string | undefined;
 
-    if (role === "STUDENT" && parentEmail) {
-        if (!parentPassword || parentPassword.length < 6) return "保護者パスワードは6文字以上で入力してください";
+    if (role === "INSTRUCTOR" && !bio) {
+        return "自己紹介・担当科目は必ず入力してください";
+    }
+
+    if (role === "STUDENT") {
+        if (!parentEmail || !parentPassword || parentPassword.length < 6) return "保護者のメールアドレスとパスワード（6文字以上）は必ず入力してください";
         try {
             const hashedPassword = await bcrypt.hash(parentPassword, 10);
             let parent = await prisma.user.findUnique({ where: { email: parentEmail } });
@@ -177,5 +162,9 @@ export async function logout() {
 }
 
 export async function lineLogin() {
-    await signIn("line");
+    await signIn("line", { redirectTo: "/" });
+}
+
+export async function instructorLineLogin() {
+    await signIn("line", { redirectTo: "/" });
 }

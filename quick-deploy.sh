@@ -8,7 +8,7 @@ gcloud run deploy reservation-service \
   --platform managed \
   --allow-unauthenticated \
   --project project-bfeb0bc9-9bbc-4920-965 \
-  --update-env-vars "DATABASE_URL=postgresql://postgres.gubmbkybqkmyrzdtheya:Yamamoto_Hasegawa2525@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true" \
+  --update-env-vars "DATABASE_URL=postgresql://postgres:Yamamoto_Hasegawa2525@db.gubmbkybqkmyrzdtheya.supabase.co:5432/postgres?connect_timeout=30&pool_timeout=30" \
   --update-env-vars "AUTH_SECRET=vhQzYpGX9dlG4DYdrxZ9dlr86f+mFzdn9fJhquHB0Ng=" \
   --update-env-vars "AUTH_TRUST_HOST=true" \
   --update-env-vars "NEXTAUTH_URL=https://reservation-service-1062807300473.asia-northeast1.run.app" \

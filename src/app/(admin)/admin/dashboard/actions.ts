@@ -4,9 +4,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
-import { sendLineMessage } from "@/lib/line";
 
 // ユーザー管理: 全ユーザー取得
 export async function getUsers() {
@@ -17,24 +14,18 @@ export async function getUsers() {
         where: { archivedAt: null },
         orderBy: { name: 'asc' },
         include: {
-            _count: {
-                select: { studentBookings: true, instructorShifts: true }
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             admissionResults: true,
             dedicatedInstructor: { select: { id: true, name: true } }
-        } as any
+        }
     });
 }
 
 // ユーザー管理: アーカイブ済みユーザー検索
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getArchivedUsers(filters: { role: string; year: string; school: string; status: string }) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return [];
 
     // Base query
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {
         archivedAt: { not: null }
     };
@@ -75,12 +66,11 @@ export async function getArchivedUsers(filters: { role: string; year: string; sc
         orderBy: { archivedAt: 'desc' },
         include: {
             admissionResults: true
-        } as any
+        }
     });
 }
 
 // ユーザー管理: アーカイブ（論理削除）
-// ユーザー管理: アーカイブ（論理削除/物理削除）
 export async function archiveUser(userId: string) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
@@ -96,30 +86,7 @@ export async function archiveUser(userId: string) {
         if (user.role === "INSTRUCTOR") {
             // Hard Delete for Instructor
             await prisma.$transaction(async (tx) => {
-                // 1. Delete ArchiveAccess
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (tx as any).archiveAccess.deleteMany({ where: { instructorId: userId } });
-
-                // 2. Delete ScheduleRequests
-                await tx.scheduleRequest.deleteMany({ where: { instructorId: userId } });
-
-                // 3. Delete Shifts and related Bookings/Reports
-                const shifts = await tx.shift.findMany({ where: { instructorId: userId }, select: { id: true } });
-                const shiftIds = shifts.map(s => s.id);
-
-                if (shiftIds.length > 0) {
-                    // Find bookings to delete reports
-                    const bookings = await tx.booking.findMany({ where: { shiftId: { in: shiftIds } }, select: { id: true } });
-                    const bookingIds = bookings.map(b => b.id);
-
-                    if (bookingIds.length > 0) {
-                        await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                        await tx.booking.deleteMany({ where: { shiftId: { in: shiftIds } } });
-                    }
-                    await tx.shift.deleteMany({ where: { instructorId: userId } });
-                }
-
-                // 4. Delete the User
+                await tx.archiveAccess.deleteMany({ where: { instructorId: userId } });
                 await tx.user.delete({ where: { id: userId } });
             });
 
@@ -130,14 +97,13 @@ export async function archiveUser(userId: string) {
             const now = new Date();
             const currentYear = now.getFullYear();
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             await prisma.user.update({
                 where: { id: userId },
                 data: {
                     archivedAt: now,
                     archiveYear: currentYear,
-                    isActive: false // Also deactivate
-                } as any
+                    isActive: false
+                }
             });
 
             revalidatePath("/admin/dashboard");
@@ -155,14 +121,13 @@ export async function unarchiveUser(userId: string) {
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await prisma.user.update({
             where: { id: userId },
             data: {
                 archivedAt: null,
                 archiveYear: null,
                 isActive: true
-            } as any
+            }
         });
 
         revalidatePath("/admin/dashboard");
@@ -172,109 +137,16 @@ export async function unarchiveUser(userId: string) {
     }
 }
 
-// 授業管理: 全講師取得（シフト表示用）
-export async function getAllInstructors() {
-    const session = await auth();
-    if (session?.user?.role !== "ADMIN") return [];
-
-    return await prisma.user.findMany({
-        where: { role: "INSTRUCTOR" },
-        select: { id: true, name: true }
-    });
-}
-
-// 授業管理: 全体シフト取得（カレンダー用）
-export async function getMasterSchedule() {
-    const session = await auth();
-    if (session?.user?.role !== "ADMIN") return [];
-
-    return await prisma.shift.findMany({
-        where: {
-            // For now, fetch all or maybe limit to recent/future?
-            // Let's fetch +/- 3 months or just all for simplicity first
-            start: {
-                gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) // From 1 month ago
-            }
-        },
-        include: {
-            instructor: { select: { name: true } },
-            bookings: {
-                include: {
-                    student: { select: { name: true } }
-                }
-            }
-        },
-        orderBy: { start: 'asc' }
-    });
-}
-
-
-// 授業管理: 特権シフト作成（制限なし）
-export async function adminCreateShift(instructorId: string, date: Date, time: string) {
-    const session = await auth();
-    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
-
-    const [hours, minutes] = time.split(":").map(Number);
-    const startDateTime = new Date(date);
-    startDateTime.setHours(hours, minutes, 0, 0);
-    const endDateTime = new Date(startDateTime);
-    endDateTime.setHours(startDateTime.getHours() + 1); // Default 1 hour
-
-    try {
-        await prisma.shift.create({
-            data: {
-                instructorId,
-                start: startDateTime,
-                end: endDateTime,
-                type: "INDIVIDUAL",
-                isPublished: true,
-                location: "ONLINE" // Default
-            }
-        });
-        revalidatePath("/admin/dashboard");
-        return { success: true };
-    } catch (e) {
-        return { error: "シフト作成に失敗しました" };
-    }
-}
-
-// 授業管理: 特権シフト削除（予約があっても削除）
-export async function adminDeleteShift(shiftId: string) {
-    const session = await auth();
-    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
-
-    try {
-        // Bookings are cascaded? Usually not by default in prisma unless configured but let's check or do manual delete
-        // Schema doesn't specify cascade. Need to delete bookings first.
-
-        await prisma.booking.deleteMany({
-            where: { shiftId }
-        });
-
-        await prisma.shift.delete({
-            where: { id: shiftId }
-        });
-
-        revalidatePath("/admin/dashboard");
-        return { success: true };
-    } catch (e) {
-        console.error(e);
-        return { error: "シフト削除に失敗しました" };
-    }
-}
-
 // アーカイブアクセス権限管理: 取得
 export async function getArchiveAccesses(studentId: string) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return [];
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const accesses = await (prisma as any).archiveAccess.findMany({
+        const accesses = await prisma.archiveAccess.findMany({
             where: { studentId },
             include: { instructor: { select: { id: true, name: true } } }
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return accesses.map((a: any) => a.instructor);
     } catch (e) {
         return [];
@@ -287,8 +159,7 @@ export async function grantArchiveAccess(instructorId: string, studentId: string
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).archiveAccess.create({
+        await prisma.archiveAccess.create({
             data: { instructorId, studentId }
         });
         revalidatePath("/admin/dashboard");
@@ -304,8 +175,7 @@ export async function revokeArchiveAccess(instructorId: string, studentId: strin
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).archiveAccess.deleteMany({
+        await prisma.archiveAccess.deleteMany({
             where: { instructorId, studentId }
         });
         revalidatePath("/admin/dashboard");
@@ -315,80 +185,10 @@ export async function revokeArchiveAccess(instructorId: string, studentId: strin
     }
 }
 
-// 授業管理: 特権予約作成（強制予約）
-export async function adminCreateBooking(shiftId: string, studentId: string) {
-    const session = await auth();
-    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
-
-    const shift = await prisma.shift.findUnique({
-        where: { id: shiftId },
-        include: {
-            bookings: { where: { status: "CONFIRMED" } },
-            instructor: true,
-            shiftInstructors: { include: { instructor: true } }
-        }
-    });
-
-    if (!shift) return { error: "Shift not found" };
-
-    if (shift.type === "INDIVIDUAL" && shift.bookings.length > 0) {
-        return { error: "既に予約が入っています" };
-    }
-
-    const student = await prisma.user.findUnique({
-        where: { id: studentId }
-    });
-
-    if (!student) return { error: "Student not found" };
-
-    try {
-        await prisma.booking.create({
-            data: {
-                shiftId,
-                studentId,
-                status: "CONFIRMED",
-                meetingType: "ONLINE"
-            }
-        });
-
-        // LINE Notification
-        const dateStr = format(shift.start, "MM/dd", { locale: ja });
-        const timeStr = `${format(shift.start, "HH:mm", { locale: ja })} - ${format(shift.end, "HH:mm", { locale: ja })}`;
-        const locationText = shift.location === 'ONLINE' ? 'オンライン' :
-            shift.location === 'TACHIKAWA' ? '立川校舎' :
-                shift.location === 'KICHIJOJI' ? '吉祥寺校舎' : 'オンライン';
-        const typeText = shift.type === 'INDIVIDUAL' ? '個別指導' : shift.type === "GROUP" ? "集団授業" : "特別授業";
-
-        const studentName = (student as any)?.name || "生徒";
-        const studentBody = `【予約確定通知（管理者代行）】\n${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。`;
-        const instructorBody = `【予約確定通知（管理者代行）】\n${dateStr} ${timeStr} ${locationText} ${typeText} ${studentName} さん\n予約が確定しました。`;
-
-        // Unique recipients
-        const recipients = new Map<string, string>();
-        if ((student as any).lineUserId) recipients.set((student as any).lineUserId, studentBody);
-
-        const allInstructors = [shift.instructor, ...(shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
-        for (const inst of allInstructors) {
-            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
-        }
-
-        for (const [lineId, msg] of recipients) {
-            await sendLineMessage(lineId, msg);
-        }
-
-        revalidatePath("/admin/dashboard");
-        return { success: true };
-    } catch (e) {
-        console.error(e);
-        return { error: "予約作成に失敗しました" };
-    }
-}
-
 // システム設定: 取得
 export async function getGlobalSettings(key: string) {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const setting = await (prisma as any).globalSettings.findUnique({
+        const setting = await prisma.globalSettings.findUnique({
             where: { key }
         });
         return { value: setting?.value ?? null };
@@ -403,8 +203,7 @@ export async function updateGlobalSettings(key: string, value: string, descripti
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
 
     try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (prisma as any).globalSettings.upsert({
+        await prisma.globalSettings.upsert({
             where: { key },
             update: { value, description },
             create: { key, value, description }
@@ -417,11 +216,7 @@ export async function updateGlobalSettings(key: string, value: string, descripti
     }
 }
 
-
-
-
 // 生徒プロフィール更新
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateStudentProfile(
     studentId: string,
     data: {
@@ -460,7 +255,6 @@ export async function updateStudentProfile(
 }
 
 // 志望校・合否情報更新
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function updateAdmissionResults(studentId: string, results: any[]) {
     const session = await auth();
     if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
@@ -468,13 +262,10 @@ export async function updateAdmissionResults(studentId: string, results: any[]) 
     try {
         // Transaction to replace all results
         await prisma.$transaction(async (tx) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (tx as any).admissionResult.deleteMany({ where: { studentId } });
+            await tx.admissionResult.deleteMany({ where: { studentId } });
 
             if (results.length > 0) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                await (tx as any).admissionResult.createMany({
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await tx.admissionResult.createMany({
                     data: results.map((r: any) => ({
                         studentId,
                         schoolName: r.schoolName,
@@ -519,39 +310,21 @@ export async function permanentDeleteUser(userId: string, passwordConfirm: strin
             const user = await tx.user.findUnique({ where: { id: userId } });
             if (!user) throw new Error("User not found");
 
-            // Common for both roles
-            await tx.admissionResult.deleteMany({ where: { studentId: userId } });
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (tx as any).archiveAccess.deleteMany({
-                where: { OR: [{ studentId: userId }, { instructorId: userId }] }
+            // Nullify self-referencing relations pointing to this user
+            await tx.user.updateMany({
+                where: { parentId: userId },
+                data: { parentId: null }
+            });
+            await tx.user.updateMany({
+                where: { dedicatedInstructorId: userId },
+                data: { dedicatedInstructorId: null }
             });
 
-            if (user.role === "INSTRUCTOR") {
-                // Delete everything related to shifts
-                const shifts = await tx.shift.findMany({ where: { instructorId: userId }, select: { id: true } });
-                const shiftIds = shifts.map(s => s.id);
-
-                if (shiftIds.length > 0) {
-                    const bookings = await tx.booking.findMany({ where: { shiftId: { in: shiftIds } }, select: { id: true } });
-                    const bookingIds = bookings.map(b => b.id);
-                    if (bookingIds.length > 0) {
-                        await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                    }
-                    await tx.booking.deleteMany({ where: { shiftId: { in: shiftIds } } });
-                    await tx.shiftInstructor.deleteMany({ where: { shiftId: { in: shiftIds } } });
-                    await tx.shift.deleteMany({ where: { instructorId: userId } });
-                }
-                await tx.scheduleRequest.deleteMany({ where: { instructorId: userId } });
-            } else {
-                // Delete everything related to student bookings
-                const bookings = await tx.booking.findMany({ where: { studentId: userId }, select: { id: true } });
-                const bookingIds = bookings.map(b => b.id);
-                if (bookingIds.length > 0) {
-                    await tx.report.deleteMany({ where: { bookingId: { in: bookingIds } } });
-                }
-                await tx.booking.deleteMany({ where: { studentId: userId } });
-                await tx.scheduleRequest.deleteMany({ where: { studentId: userId } });
-            }
+            // Common for all roles: remove ArchiveAccess, AdmissionResult, ScheduleRequests
+            await tx.admissionResult.deleteMany({ where: { studentId: userId } });
+            await tx.archiveAccess.deleteMany({
+                where: { OR: [{ studentId: userId }, { instructorId: userId }] }
+            });
 
             // Finally delete the user
             await tx.user.delete({ where: { id: userId } });
@@ -560,8 +333,8 @@ export async function permanentDeleteUser(userId: string, passwordConfirm: strin
         revalidatePath("/admin/dashboard");
         return { success: true, message: "データを完全に削除しました" };
     } catch (e) {
-        console.error(e);
-        return { error: "完全削除に失敗しました" };
+        console.error("Permanent delete transaction error:", e);
+        return { error: "完全削除に失敗しました: " + (e instanceof Error ? e.message : String(e)) };
     }
 }
 
@@ -572,12 +345,87 @@ export async function updateLineUserId(userId: string, lineUserId: string) {
     try {
         await prisma.user.update({
             where: { id: userId },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            data: { lineUserId } as any
+            data: { lineUserId }
         });
         revalidatePath("/admin/dashboard");
         return { success: true };
     } catch (e) {
         return { error: "LINE IDの更新に失敗しました" };
+    }
+}
+
+export async function updateUserRole(userId: string, role: string) {
+    const session = await auth();
+    if (session?.user?.role !== "ADMIN") return { error: "Unauthorized" };
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({
+                where: { id: userId },
+                include: {
+                    admissionResults: true
+                }
+            });
+
+            if (!user) throw new Error("User not found");
+
+            if (user.role === "STUDENT" && role === "INSTRUCTOR") {
+                const hasBasicInfo = !!(user.schoolName || user.grade || user.researchTheme || user.gpa || user.qualifications);
+                const hasAdmission = user.admissionResults.length > 0;
+
+                if (hasBasicInfo || hasAdmission) {
+                    const now = new Date();
+                    const currentYear = now.getFullYear();
+                    // Email & Line IDs must be safely unique
+                    const archivedEmail = user.email ? `archived_${Date.now()}_${user.email}` : null;
+                    const archivedLineId = user.lineUserId ? `archived_${Date.now()}_${user.lineUserId}` : null;
+                    const archivedUser = await tx.user.create({
+                        data: {
+                            name: `${user.name} (アーカイブ)`,
+                            email: archivedEmail,
+                            lineUserId: archivedLineId,
+                            role: "STUDENT",
+                            isActive: false,
+                            archivedAt: now,
+                            archiveYear: currentYear,
+                            schoolName: user.schoolName,
+                            grade: user.grade,
+                            researchTheme: user.researchTheme,
+                            gpa: user.gpa,
+                            qualifications: user.qualifications,
+                            canInternalUpgrade: user.canInternalUpgrade,
+                            dedicatedInstructorId: user.dedicatedInstructorId,
+                        }
+                    });
+
+                    if (hasAdmission) {
+                        await tx.admissionResult.updateMany({
+                            where: { studentId: userId },
+                            data: { studentId: archivedUser.id }
+                        });
+                    }
+                }
+            }
+
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    role,
+                    schoolName: role === "INSTRUCTOR" ? null : undefined,
+                    grade: role === "INSTRUCTOR" ? null : undefined,
+                    researchTheme: role === "INSTRUCTOR" ? null : undefined,
+                    gpa: role === "INSTRUCTOR" ? null : undefined,
+                    qualifications: role === "INSTRUCTOR" ? null : undefined,
+                    canInternalUpgrade: role === "INSTRUCTOR" ? null : undefined,
+                    dedicatedInstructorId: role === "INSTRUCTOR" ? null : undefined,
+                }
+            });
+        });
+
+        revalidatePath("/admin/dashboard");
+        return { success: true };
+    } catch (e) {
+        console.error("Failed to update user role:", e);
+        return { error: "権限の更新に失敗しました" };
     }
 }

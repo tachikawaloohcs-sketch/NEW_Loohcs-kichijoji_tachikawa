@@ -17,10 +17,6 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
         }),
         Credentials({
             async authorize(credentials) {
-                if (credentials.id && credentials.password === "next-auth-bypass") {
-                    // Bypass for testing if needed
-                }
-
                 const email = credentials.email as string;
                 const password = credentials.password as string;
 
@@ -169,5 +165,13 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
             }
             return token;
         },
+        async session({ session, token }) {
+            if (token && session.user) {
+                session.user.role = token.role as string;
+                session.user.id = token.id as string;
+                (session.user as any).isProfileComplete = token.isProfileComplete;
+            }
+            return session;
+        }
     }
 });

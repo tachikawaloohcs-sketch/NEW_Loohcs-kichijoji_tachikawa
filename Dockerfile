@@ -41,4 +41,5 @@ EXPOSE 3000
 RUN chmod +x migrate.sh
 
 # Start command
+ENV TZ="Asia/Tokyo"
 CMD ["/bin/sh", "-c", "./migrate.sh && npm start"]

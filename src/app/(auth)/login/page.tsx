@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, Suspense } from "react";
 import { useFormStatus } from "react-dom";
-import { authenticate, lineLogin } from "@/lib/actions";
+import { authenticate, lineLogin, instructorLineLogin } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,8 +99,18 @@ function LoginForm() {
                                 className="group flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-primary transition-all"
                             >
                                 <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-primary transition-colors" />
-                                保護者・管理者はこちら
+                                保護者・管理者はこちら（メールアドレス）
                             </button>
+                        </div>
+
+                        <div className="pt-2 flex justify-center border-t border-slate-100 dark:border-slate-800 mt-4">
+                            <Button
+                                variant="ghost"
+                                className="text-xs text-muted-foreground hover:text-blue-600 dark:hover:text-blue-400 h-auto p-2"
+                                onClick={() => instructorLineLogin()}
+                            >
+                                講師の方はこちら（LINE連携済みのみ）
+                            </Button>
                         </div>
                     </div>
                 ) : (
@@ -164,7 +174,7 @@ function LoginForm() {
                     &copy; {new Date().getFullYear()} Loohcs-kichijoji_tachikawa. All rights reserved.
                 </p>
             </div>
-        </Card>
+        </Card >
     );
 }
 

@@ -1,56 +1,36 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { redirect } from "next/navigation";
-import { getInstructors, getStudentBookings } from "./actions";
 import StudentDashboardClient from "./StudentDashboardClient";
-import { Button } from "@/components/ui/button";
-import { logout } from "@/lib/actions";
+import { redirect } from "next/navigation";
+import { getInstructors } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentDashboardPage() {
     const session = await auth();
-    if (!session?.user?.id) redirect("/login");
+    console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id, session?.user?.hasChangedParentPassword);
 
-    const user = await prisma.user.findUnique({
+    if (!session?.user || session.user.role !== "STUDENT") {
+        redirect("/login");
+    }
+    const dbUser = await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { isProfileComplete: true }
+        select: { id: true, role: true, isProfileComplete: true, name: true, hasChangedParentPassword: true, lineUserId: true }
     });
 
-    if (!user?.isProfileComplete) {
-        redirect("/setup-profile");
+    if (!dbUser || dbUser.role !== "STUDENT") {
+        const { redirect } = await import("next/navigation");
+        redirect("/api/force-logout");
     }
 
-    try {
-        const [instructors, bookings] = await Promise.all([
-            getInstructors(),
-            getStudentBookings()
-        ]);
+    const [instructors] = await Promise.all([
+        getInstructors()
+    ]);
 
-        return (
-            <div className="p-8 space-y-8 max-w-6xl mx-auto">
-                <header className="flex justify-between items-center border-b pb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">生徒マイページ</h1>
-                        <p className="text-muted-foreground">授業の予約と履歴確認</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <form action={logout}>
-                            <Button variant="outline">ログアウト</Button>
-                        </form>
-                    </div>
-                </header>
-
-                <StudentDashboardClient instructors={instructors} initialBookings={bookings} />
-            </div>
-        );
-    } catch (error) {
-        console.error("Error loading StudentDashboard:", error);
-        return (
-            <div className="p-8 text-center text-red-500">
-                <h1 className="text-2xl font-bold mb-4">エラーが発生しました</h1>
-                <p>現在、データを読み込めません。しばらく経ってから再度お試しください。</p>
-            </div>
-        );
-    }
+    return (
+        <StudentDashboardClient
+            user={dbUser}
+            instructors={instructors}
+        />
+    );
 }

@@ -1,10 +1,9 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth, isSameMonth } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 export async function getParentDashboardData() {
     const session = await auth();
-    // ロールチェック: "PARENT" または "ADMIN" も一旦許可するか、ログイン制限なしにするか
     if (!session?.user?.id) return { error: "Unauthorized" };
 
     try {
@@ -38,8 +37,14 @@ export async function getParentDashboardData() {
         }
 
         const now = new Date();
-        const start = startOfMonth(now);
-        const end = endOfMonth(now);
+        const currentMonthStart = startOfMonth(now);
+        const currentMonthEnd = endOfMonth(now);
+
+        const lastMonthStart = startOfMonth(subMonths(now, 1));
+        const lastMonthEnd = endOfMonth(subMonths(now, 1));
+
+        const twoMonthsAgoStart = startOfMonth(subMonths(now, 2));
+        const twoMonthsAgoEnd = endOfMonth(subMonths(now, 2));
 
         const childrenData = (parent as any).children.map((child: any) => {
             const bookings = child.studentBookings;
@@ -47,18 +52,34 @@ export async function getParentDashboardData() {
             // 今月の予約数（CONFIRMED）
             const monthlyBookings = bookings.filter((b: any) =>
                 b.status === "CONFIRMED" &&
-                b.shift.start >= start &&
-                b.shift.start <= end
+                b.shift.start >= currentMonthStart &&
+                b.shift.start <= currentMonthEnd
             );
 
-            // 授業種別ごとの予約数
-            const bookingStats: Record<string, number> = {};
-            bookings.forEach((b: any) => {
-                if (b.status === "CONFIRMED") {
-                    const type = b.shift.type;
-                    bookingStats[type] = (bookingStats[type] || 0) + 1;
-                }
-            });
+            // 授業種別ごとの月合計：「個別・集団」と「特別パック」に分けて集計
+            const regularTypes = ["INDIVIDUAL", "GROUP", "BEGINNER", "TRIAL"];
+            const specialTypes = ["SPECIAL", "SPECIAL_PACK"];
+
+            const getStatsForPeriod = (start: Date, end: Date) => {
+                const periodBookings = bookings.filter((b: any) =>
+                    b.status === "CONFIRMED" &&
+                    b.shift.start >= start &&
+                    b.shift.start <= end
+                );
+                const regularCount = periodBookings.filter((b: any) =>
+                    regularTypes.includes(b.shift.type)
+                ).length;
+                const specialCount = periodBookings.filter((b: any) =>
+                    specialTypes.includes(b.shift.type)
+                ).length;
+                return { regularCount, specialCount };
+            };
+
+            const stats = {
+                currentMonth: getStatsForPeriod(currentMonthStart, currentMonthEnd),
+                lastMonth: getStatsForPeriod(lastMonthStart, lastMonthEnd),
+                twoMonthsAgo: getStatsForPeriod(twoMonthsAgoStart, twoMonthsAgoEnd),
+            };
 
             // 授業履歴（完了したもの）
             const history = bookings.filter((b: any) => b.status === "CONFIRMED" && b.shift.end < now);
@@ -71,21 +92,25 @@ export async function getParentDashboardData() {
                 name: child.name,
                 email: child.email,
                 monthlyCount: monthlyBookings.length,
-                stats: bookingStats,
+                stats: stats,
                 history: history.map((h: any) => ({
                     id: h.id,
-                    date: h.shift.start,
+                    start: h.shift.start,
+                    end: h.shift.end,
                     instructor: h.shift.instructor.name,
                     type: h.shift.type,
                     location: h.shift.location,
+                    meetingType: h.meetingType,
                     report: h.report ? { content: h.report.content, feedback: h.report.feedback } : null
                 })),
                 upcoming: upcoming.map((u: any) => ({
                     id: u.id,
-                    date: u.shift.start,
+                    start: u.shift.start,
+                    end: u.shift.end,
                     instructor: u.shift.instructor.name,
                     type: u.shift.type,
                     location: u.shift.location,
+                    meetingType: u.meetingType,
                 }))
             };
         });

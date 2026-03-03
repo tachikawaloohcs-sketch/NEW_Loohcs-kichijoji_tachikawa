@@ -18,7 +18,7 @@ model User {
   password          String? // Optional for LINE-only users
   bio               String? // Instructor bio/subjects
   imageUrl          String? // Avatar image URL
-  role              String // "ADMIN", "INSTRUCTOR", "STUDENT"
+  role              String // "ADMIN", "INSTRUCTOR", "STUDENT", "PARENT"
   isActive          Boolean  @default(true)
   isProfileComplete Boolean  @default(false)
   createdAt         DateTime @default(now())
@@ -42,13 +42,8 @@ model User {
   dedicatedInstructor   User?   @relation("DedicatedStudent", fields: [dedicatedInstructorId], references: [id])
   dedicatedStudents     User[]  @relation("DedicatedStudent")
 
-  // Relations
-  instructorShifts  Shift[]           @relation("InstructorShifts")
-  studentBookings   Booking[]         @relation("StudentBookings")
-  shiftInstructions ShiftInstructor[] @relation("ShiftInstructors")
-
-  sentRequests     ScheduleRequest[] @relation("StudentRequests")
-  receivedRequests ScheduleRequest[] @relation("InstructorRequests")
+  studentReports      Report[]  @relation("StudentReports")
+  instructorReports   Report[]  @relation("InstructorReports")
 
   // Archiving & Admission
   archivedAt  DateTime?
@@ -62,6 +57,9 @@ model User {
   parentId String?
   parent   User?   @relation("ParentChildren", fields: [parentId], references: [id])
   children User[]  @relation("ParentChildren")
+
+  hasChangedParentPassword Boolean @default(false)
+  themes            ResearchTheme[] @relation("StudentThemes")
 }
 
 model ArchiveAccess {
@@ -92,77 +90,19 @@ model AdmissionResult {
   @@unique([studentId, rank])
 }
 
-model Shift {
-  id           String   @id @default(cuid())
-  instructorId String
-  instructor   User     @relation("InstructorShifts", fields: [instructorId], references: [id])
-  start        DateTime
-  end          DateTime
-  type         String // "INDIVIDUAL", "GROUP", "SPECIAL", "BEGINNER", "TRIAL"
-  className    String? // For Group/Special
-  isPublished  Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  bookings         Booking[]
-  shiftInstructors ShiftInstructor[] // Multiple instructors for group lessons
-  maxCapacity      Int? // NULL = unlimited, number = max bookings
-
-  location String @default("ONLINE") // "ONLINE", "KICHIJOJI", "TACHIKAWA"
-}
-
-model ShiftInstructor {
-  id           String   @id @default(cuid())
-  shiftId      String
-  shift        Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  instructorId String
-  instructor   User     @relation("ShiftInstructors", fields: [instructorId], references: [id])
-  createdAt    DateTime @default(now())
-
-  @@unique([shiftId, instructorId])
-}
-
-model Booking {
-  id          String   @id @default(cuid())
-  studentId   String
-  student     User     @relation("StudentBookings", fields: [studentId], references: [id])
-  shiftId     String
-  shift       Shift    @relation(fields: [shiftId], references: [id])
-  status      String // "CONFIRMED", "CANCELLED"
-  meetingType String   @default("ONLINE") // "ONLINE", "IN_PERSON"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  report Report?
-}
-
 model Report {
   id            String   @id @default(cuid())
-  bookingId     String   @unique
-  booking       Booking  @relation(fields: [bookingId], references: [id])
+  studentId     String
+  student       User     @relation("StudentReports", fields: [studentId], references: [id])
+  instructorId  String
+  instructor    User     @relation("InstructorReports", fields: [instructorId], references: [id])
   content       String // Report content
   logUrl        String? // URL to class log
   homework      String? // Homework assigned
   feedback      String? // Student feedback
-  submittedLate Boolean  @default(false) // Whether the report was submitted late
+  date          DateTime @default(now()) // Shift date alternative
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-}
-
-model ScheduleRequest {
-  id           String   @id @default(cuid())
-  studentId    String
-  student      User     @relation("StudentRequests", fields: [studentId], references: [id])
-  instructorId String
-  instructor   User     @relation("InstructorRequests", fields: [instructorId], references: [id])
-  start        DateTime
-  end          DateTime
-  location     String   @default("ONLINE")
-  type         String   @default("INDIVIDUAL") // "INDIVIDUAL", "GROUP"
-  status       String   @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
-  message      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
 }
 
 model GlobalSettings {
@@ -170,4 +110,55 @@ model GlobalSettings {
   value       String
   description String?
   updatedAt   DateTime @updatedAt
+}
+
+// --- Locus Concept Models ---
+
+model ResearchTheme {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     User     @relation("StudentThemes", fields: [studentId], references: [id])
+  title       String
+  status      String   @default("ACTIVE") // ACTIVE, FROZEN, ARCHIVED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  records     UpdateRecord[]
+}
+
+model UpdateRecord {
+  id          String   @id @default(cuid())
+  themeId     String
+  theme       ResearchTheme @relation(fields: [themeId], references: [id])
+  classDate   DateTime @default(now())
+
+  // 1. 今の問い (Current Question)
+  questionText      String
+  questionChanged   Boolean  @default(false)
+
+  // 2. 今の仮説 (Current Hypothesis)
+  hypothesisText    String
+  evidences         String // JSON string array
+  unverifiedPremises String // JSON string array
+
+  // 3. 外部接触 (External Contact)
+  contactType       String   // "PREPARATION" or "REFLECTION"
+  contactTarget     String?  // 誰に
+  contactPurpose    String?  // 何を確かめるか
+  contactExpectedRefutation String? // 想定反論
+  contactReceivedFeedback String?   // 何を言われたか
+  contactBrokenParts String?        // 何が崩れたか
+  contactFixPlan    String?         // どう修正するか
+
+  // 4. 再定義 (Redefinition)
+  redefinitionText  String?  // 仮説／問いの変更点
+
+  // 5. 振り返りと次なる一歩 (Reflection & Next Steps)
+  studentReflection String?
+  nextAction        String?
+
+  // Comments from instructor
+  instructorComment String?
+
+  createdAt   DateTime @default(now())
 }

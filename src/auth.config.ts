@@ -1,5 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
 
+const isSecureContext = process.env.NODE_ENV === "production" || !!process.env.NEXT_PUBLIC_APP_URL?.startsWith("https://");
+
 export const authConfig: NextAuthConfig = {
     pages: {
         signIn: "/login",
@@ -9,6 +11,63 @@ export const authConfig: NextAuthConfig = {
         maxAge: 30 * 24 * 60 * 60, // 30 days
     },
     secret: process.env.AUTH_SECRET || "vhQzYpGX9dlG4DYdrxZ9dlr86f+mFzdn9fJhquHB0Ng=",
+    cookies: {
+        sessionToken: {
+            name: `${isSecureContext ? "__Secure-" : ""}authjs.session-token`,
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: isSecureContext,
+            },
+        },
+        callbackUrl: {
+            name: `${isSecureContext ? "__Secure-" : ""}authjs.callback-url`,
+            options: {
+                sameSite: isSecureContext ? "none" : "lax",
+                path: "/",
+                secure: isSecureContext,
+            },
+        },
+        csrfToken: {
+            name: `${isSecureContext ? "__Host-" : ""}authjs.csrf-token`,
+            options: {
+                httpOnly: true,
+                sameSite: "lax",
+                path: "/",
+                secure: isSecureContext,
+            },
+        },
+        pkceCodeVerifier: {
+            name: `${isSecureContext ? "__Secure-" : ""}authjs.pkce.code_verifier`,
+            options: {
+                httpOnly: true,
+                sameSite: isSecureContext ? "none" : "lax",
+                path: "/",
+                secure: isSecureContext,
+                maxAge: 60 * 15, // 15 minutes
+            },
+        },
+        state: {
+            name: `${isSecureContext ? "__Secure-" : ""}authjs.state`,
+            options: {
+                httpOnly: true,
+                sameSite: isSecureContext ? "none" : "lax",
+                path: "/",
+                secure: isSecureContext,
+                maxAge: 60 * 15, // 15 minutes
+            },
+        },
+        nonce: {
+            name: `${isSecureContext ? "__Secure-" : ""}authjs.nonce`,
+            options: {
+                httpOnly: true,
+                sameSite: isSecureContext ? "none" : "lax",
+                path: "/",
+                secure: isSecureContext,
+            },
+        },
+    },
     providers: [], // Configured in auth.ts to avoid edge runtime issues
     callbacks: {
         async jwt({ token, user }) {
@@ -44,6 +103,7 @@ export const authConfig: NextAuthConfig = {
                     if (nextUrl.pathname.startsWith("/student") && role !== "STUDENT") return false;
                     if (nextUrl.pathname.startsWith("/instructor") && role !== "INSTRUCTOR") return false;
                     if (nextUrl.pathname.startsWith("/admin") && role !== "ADMIN") return false;
+                    if (nextUrl.pathname.startsWith("/parent") && role !== "PARENT") return false;
                     return true;
                 }
                 return false; // Redirect unauthenticated users to login page

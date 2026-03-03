@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import { SessionProvider } from "next-auth/react";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -24,11 +26,26 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (navigator.userAgent.toLowerCase().indexOf("line") !== -1 && window.location.search.indexOf("openExternalBrowser=1") === -1) {
+                var targetUrl = window.location.href;
+                var nextUrl = targetUrl + (targetUrl.indexOf("?") === -1 ? "?" : "&") + "openExternalBrowser=1";
+                window.location.replace(nextUrl);
+              }
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

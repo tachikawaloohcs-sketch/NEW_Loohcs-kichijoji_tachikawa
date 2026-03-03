@@ -3,363 +3,65 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { format, startOfDay, subDays, isBefore } from "date-fns";
-import { ja } from "date-fns/locale";
-
-// Mock Email Function
-import { sendEmail } from "@/lib/mail";
-import { sendLineMessage } from "@/lib/line";
 
 export async function getInstructors() {
-    const instructors = await prisma.user.findMany({
+    return await prisma.user.findMany({
         where: { role: "INSTRUCTOR", isActive: true },
-        select: { id: true, name: true, email: true, bio: true, imageUrl: true }, // Force TS re-check
-    });
-    return instructors;
-}
-
-export async function getDetailedShifts(instructorId: string) {
-    // Database stores times in UTC, so we can directly compare with current time
-    const shifts = await prisma.shift.findMany({
-        where: {
-            OR: [
-                { instructorId: instructorId },
-                {
-                    shiftInstructors: {
-                        some: {
-                            instructorId: instructorId
-                        }
-                    }
-                }
-            ],
-            start: {
-                gte: new Date(),
-            },
-            isPublished: true,
-            // For INDIVIDUAL, filter in code below
-        },
-        include: {
-            bookings: true,
-            shiftInstructors: {
-                include: {
-                    instructor: {
-                        select: {
-                            id: true,
-                            name: true
-                        }
-                    }
-                }
-            },
-            instructor: { // Main instructor
-                select: {
-                    id: true,
-                    name: true
-                }
-            }
-        },
-        orderBy: {
-            start: 'asc'
-        }
-    });
-
-    return shifts.filter(s => {
-        if (s.type === "INDIVIDUAL" && s.bookings.some(b => b.status === "CONFIRMED")) return false;
-        return true;
+        select: { id: true, name: true, bio: true }
     });
 }
 
-export async function createBooking(shiftId: string, meetingType: string = "ONLINE") {
+export async function updateParentLogin(parentId: string, newEmail: string, newPassword: string) {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
+    if (!session?.user?.id || session.user.role !== "PARENT") {
         return { error: "Unauthorized" };
     }
 
-    const shift = await prisma.shift.findUnique({
-        where: { id: shiftId },
-        include: {
-            instructor: true,
-            shiftInstructors: { include: { instructor: true } }
-        }
-    });
-
-    if (!shift) return { error: "Shift not found" };
-
-    const now = new Date();
-    const lessonDate = startOfDay(new Date(shift.start));
-    const deadline = subDays(lessonDate, 1); // 0:00 of the day before
-
-    if (isBefore(deadline, now)) {
-        return { error: "予約期限切れです（授業日前日の0:00まで予約可能）" };
-    }
-
-    // Check booking availability based on shift type
-    if (shift.type === "INDIVIDUAL") {
-        // Individual shifts: only one booking allowed
-        const existingBooking = await prisma.booking.findFirst({
-            where: {
-                shiftId: shiftId,
-                status: "CONFIRMED"
-            }
-        });
-
-        if (existingBooking) {
-            return { error: "この枠は既に予約されています" };
-        }
-    } else if (shift.type === "GROUP" || shift.type === "SPECIAL_PACK") {
-        // Group shifts: check capacity if maxCapacity is set
-        if (shift.maxCapacity !== null) {
-            const confirmedCount = await prisma.booking.count({
-                where: {
-                    shiftId: shiftId,
-                    status: "CONFIRMED"
-                }
-            });
-
-            if (confirmedCount >= shift.maxCapacity) {
-                return { error: "この授業は定員に達しています" };
-            }
-        }
-        // If maxCapacity is null, unlimited bookings allowed
+    if (session.user.id !== parentId) {
+        return { error: "Unauthorized" };
     }
 
     try {
-        const booking = await prisma.booking.create({
+        const bcrypt = await import('bcryptjs');
+        const hashedPassword = await bcrypt.default.hash(newPassword, 10);
+
+        await prisma.user.update({
+            where: { id: parentId },
             data: {
-                studentId: session.user.id,
-                shiftId: shiftId,
-                status: "CONFIRMED",
-                meetingType: meetingType,
-            },
+                email: newEmail,
+                password: hashedPassword,
+                hasChangedParentPassword: true
+            }
         });
 
-        // 4. 予約確定 (双方) 
-        // 件名: 予約確定しました。 
-        // 本文: [時間] [授業場所] [授業種別] [講師名] 講師
-        // 予約が確定しました。
-        // キャンセルは授業1日前までできます。
-
-        const dateStr = format(shift.start, "MM/dd", { locale: ja });
-        const timeStr = `${format(shift.start, "HH:mm", { locale: ja })} - ${format(shift.end, "HH:mm", { locale: ja })}`;
-
-        // Location logic for Booking might be slightly different as Shift has location
-        // Shift location is simplified (ONLINE/TACHIKAWA/KICHIJOJI).
-        // If booking overrides location? No, booking has meetingType.
-        // Let's use shift location + meetingType context if needed, but User Request says [授業場所].
-        // Let's assume shift.location is the primary source.
-        const locationText = shift.location === 'ONLINE' ? 'オンライン' :
-            shift.location === 'TACHIKAWA' ? '立川校舎' :
-                shift.location === 'KICHIJOJI' ? '吉祥寺校舎' : 'オンライン';
-
-        const typeText = shift.type === 'INDIVIDUAL' ? '個別指導' : shift.type === 'GROUP' ? '集団授業' : '特別授業';
-
-        const student = await prisma.user.findUnique({ where: { id: session.user.id } });
-        const studentName = (student as any)?.name || "生徒";
-        const studentBody = `${dateStr} ${timeStr} ${locationText} ${typeText} ${shift.instructor.name} 講師\n予約が確定しました。\nキャンセルは授業1日前までできます。`;
-        const instructorBody = `${dateStr} ${timeStr} ${locationText} ${typeText} ${studentName} さん\n予約が確定しました。`;
-
-        // Unique recipients
-        const recipients = new Map<string, string>();
-        if ((student as any).lineUserId) recipients.set((student as any).lineUserId, studentBody);
-
-        const allInstructors = [shift.instructor, ...(shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
-        for (const inst of allInstructors) {
-            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
+        revalidatePath("/parent/dashboard");
+        revalidatePath("/student/dashboard"); // Revalidate both just in case
+        return { success: true };
+    } catch (error: any) {
+        if (error.code === 'P2002') { // Unique constraint failed on email
+            return { error: "このメールアドレスは既に登録されています" };
         }
-
-        for (const [lineId, msg] of recipients) {
-            await sendLineMessage(lineId, msg);
-        }
-
-        revalidatePath("/student/dashboard");
-        return { success: true, booking };
-    } catch {
-        return { error: "Database error" };
+        return { error: "更新に失敗しました" };
     }
 }
 
-export async function cancelBooking(bookingId: string) {
+export async function updateStudentName(newName: string) {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "STUDENT") {
         return { error: "Unauthorized" };
     }
 
-    const booking = await prisma.booking.findUnique({
-        where: { id: bookingId },
-        include: {
-            shift: {
-                include: {
-                    instructor: true,
-                    shiftInstructors: { include: { instructor: true } }
-                }
-            },
-            student: true
-        }
-    });
-
-    if (!booking) return { error: "Booking not found" };
-    if (booking.studentId !== session.user.id) return { error: "Unauthorized" };
-
-    const now = new Date();
-    const lessonDate = startOfDay(new Date(booking.shift.start));
-    const deadline = subDays(lessonDate, 1); // 0:00 of the day before
-
-    if (isBefore(deadline, now)) {
-        return { error: "キャンセル期限切れです（授業日前日の0:00までキャンセル可能）" };
-    }
-
     try {
-        await prisma.booking.delete({
-            where: { id: bookingId }
+        await prisma.user.update({
+            where: { id: session.user.id },
+            data: { name: newName }
         });
 
-        const dateStr = format(booking.shift.start, "MM/dd", { locale: ja });
-        const timeStr = `${format(booking.shift.start, "HH:mm", { locale: ja })} - ${format(booking.shift.end, "HH:mm", { locale: ja })}`;
-        const studentBody = `【キャンセル通知】\n${dateStr} ${timeStr} の授業予約がキャンセルされました。\n講師: ${booking.shift.instructor.name}`;
-        const instructorBody = `【キャンセル通知】\n${dateStr} ${timeStr} の授業予約がキャンセルされました。\n生徒: ${booking.student.name}`;
-
-        // Unique recipients
-        const recipients = new Map<string, string>();
-        if ((booking.student as any).lineUserId) recipients.set((booking.student as any).lineUserId, studentBody);
-
-        const allInstructors = [booking.shift.instructor, ...(booking.shift as any).shiftInstructors?.map((si: any) => si.instructor) || []].filter(Boolean);
-        for (const inst of allInstructors) {
-            if ((inst as any).lineUserId) recipients.set((inst as any).lineUserId, instructorBody);
-        }
-
-        for (const [lineId, msg] of recipients) {
-            await sendLineMessage(lineId, msg);
-        }
-
+        // Since name is in session, we might need to instruct the user to re-login, or simply revalidate
         revalidatePath("/student/dashboard");
         return { success: true };
-    } catch (e) {
-        console.error(e);
-        return { error: "Database error" };
+    } catch (error) {
+        console.error("Failed to update student name:", error);
+        return { error: "Failed to update profile" };
     }
-}
-
-export async function getStudentBookings() {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
-        return [];
-    }
-
-    const bookings = await prisma.booking.findMany({
-        where: {
-            studentId: session.user.id,
-            status: "CONFIRMED" // Include Cancelled? Maybe separate list.
-        },
-        include: {
-            shift: {
-                include: { instructor: { select: { name: true } } }
-            }
-        },
-        orderBy: {
-            shift: { start: 'desc' }
-        }
-    });
-
-    return bookings;
-    return bookings;
-}
-
-export async function createRequest(instructorId: string, date: Date, startTime: string, endTime: string, location: string, type: string) {
-    const session = await auth();
-    if (!session?.user?.id || session.user.role !== "STUDENT") {
-        return { error: "Unauthorized" };
-    }
-
-    const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [endHours, endMinutes] = endTime.split(":").map(Number);
-
-    const startDateTime = new Date(date);
-    startDateTime.setHours(startHours, startMinutes, 0, 0);
-
-    const endDateTime = new Date(date);
-    endDateTime.setHours(endHours, endMinutes, 0, 0);
-
-    // Simple validation: End must be after Start
-    if (endDateTime <= startDateTime) {
-        return { error: "終了時間は開始時間より後である必要があります" };
-    }
-
-    try {
-        const request = await prisma.scheduleRequest.create({
-            data: {
-                studentId: session.user.id,
-                instructorId: instructorId,
-                start: startDateTime,
-                end: endDateTime,
-                location: location,
-                type: type,
-                status: "PENDING"
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            include: { instructor: { select: { email: true, name: true, lineUserId: true } as any }, student: { select: { name: true } } }
-        });
-
-        // Notify Instructor
-        // 1. 日程リクエスト受信 (講師宛)
-        // 件名: 新しい日程リクエストが届きました
-        // 本文: 生徒 [生徒名] から [日付] [時間] [授業場所] [授業種別] の日程リクエストが届きました。
-        // ダッシュボードから承認・却下を行ってください。
-        // ＜ここにダッシュボードURL貼って。＞
-
-        const dateStr = format(startDateTime, "MM/dd", { locale: ja });
-        const timeStr = format(startDateTime, "HH:mm", { locale: ja });
-        const locationText = getLocationLabel(location);
-        const typeText = getTypeLabel(type);
-        const dashboardUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/instructor/dashboard`;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const reqAny = request as any;
-        const body = `生徒 ${reqAny.student.name} から ${dateStr} ${format(startDateTime, "HH:mm", { locale: ja })} - ${format(endDateTime, "HH:mm", { locale: ja })} ${locationText} ${typeText} の日程リクエストが届きました。\nダッシュボードから承認・却下を行ってください。\n\n${dashboardUrl}`;
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const instructor = reqAny.instructor as any;
-        console.log(`[Request Created] Student: ${reqAny.student.name}, Instructor: ${instructor.name}, Instructor LINE ID: ${instructor.lineUserId || 'NOT SET'}`);
-        if (instructor.lineUserId) {
-            await sendLineMessage(instructor.lineUserId, body);
-        } else {
-            console.warn(`[Request Notification Skipped] Instructor ${instructor.name} has no LINE ID`);
-        }
-
-        // Notify Student (Newly added)
-        const student = await prisma.user.findUnique({ where: { id: session.user.id } });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        console.log(`[Request Created] Student LINE ID: ${(student as any)?.lineUserId || 'NOT SET'}`);
-        if ((student as any)?.lineUserId) {
-            await sendLineMessage((student as any).lineUserId, `【リクエスト送信完了】\n${dateStr} ${timeStr} の日程リクエストを ${reqAny.instructor.name} 講師に送信しました。`);
-        } else {
-            console.warn(`[Request Notification Skipped] Student ${reqAny.student.name} has no LINE ID`);
-        }
-
-        revalidatePath("/student/dashboard");
-        return { success: true };
-    } catch (e) {
-        console.error(e);
-        return { error: "リクエスト送信に失敗しました" };
-    }
-}
-
-function getLocationLabel(loc: string) {
-    if (loc === 'KICHIJOJI') return '吉祥寺校舎';
-    if (loc === 'TACHIKAWA') return '立川校舎';
-    if (loc === 'ONLINE') return 'オンライン';
-    if (loc.includes('ONLINE_TACHIKAWA')) return 'オンライン・立川校舎は講師の都合に合わせます。（推奨）';
-    if (loc.includes('ONLINE_KICHIJOJI')) return 'オンライン・吉祥寺校舎はどちらか講師の都合に合わせます。（推奨）'; // User text says "Online/Kichijoji" but let's stick to their text request if possible or closest match
-    // Actually user requested text:
-    // オンライン・立川校舎は講師の都合に合わせます。（推奨）
-    // オンライン・どちらの校舎かは講師の都合に合わせます。（推奨） -> meant for Kichijoji/Tachikawa or just "Both schools"?
-    // Let's assume the keys I will stick to are: 'ONLINE_TACHIKAWA', 'ONLINE_KICHIJOJI', 'ONLINE_ANY'
-    if (loc === 'ONLINE_ANY') return 'オンライン・どちらの校舎かは講師の都合に合わせます。（推奨）';
-
-    return 'オンライン';
-}
-
-function getTypeLabel(type: string) {
-    if (type === 'INDIVIDUAL') return '個別指導';
-    if (type === 'GROUP') return '集団授業';
-    if (type === 'SPECIAL') return '特別授業';
-    return '個別指導';
 }

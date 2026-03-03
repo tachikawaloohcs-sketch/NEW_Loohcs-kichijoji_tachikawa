@@ -8,10 +8,14 @@ export default async function SetupProfilePage() {
     if (!session?.user) redirect("/login");
 
     const user = await prisma.user.findUnique({
-        where: { id: session.user.id }
+        where: { id: session.user.id },
+        select: { id: true, name: true, role: true, bio: true, isProfileComplete: true }
     });
 
-    if (!user) redirect("/login");
+    if (!user) {
+        redirect("/api/force-logout");
+        return null;
+    }
     if (user.isProfileComplete) {
         // Redirect to dashboard based on role
         if (user.role === "ADMIN") redirect("/admin/dashboard");
