@@ -10,7 +10,7 @@ export default async function InstructorDashboardPage() {
     const session = await auth();
     console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id);
 
-    if (!session?.user || session.user.role !== "INSTRUCTOR") {
+    if (!session?.user || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) {
         redirect("/login");
     }
 
@@ -19,7 +19,7 @@ export default async function InstructorDashboardPage() {
         select: { id: true, role: true, isProfileComplete: true, name: true, email: true, lineUserId: true, bio: true }
     });
 
-    if (!dbUser || dbUser.role !== "INSTRUCTOR") {
+    if (!dbUser || (dbUser.role !== "INSTRUCTOR" && dbUser.role !== "ADMIN")) {
         const { redirect } = await import("next/navigation");
         redirect("/api/force-logout");
     }

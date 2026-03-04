@@ -10,7 +10,7 @@ export default async function StudentDashboardPage() {
     const session = await auth();
     console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id, session?.user?.hasChangedParentPassword);
 
-    if (!session?.user || session.user.role !== "STUDENT") {
+    if (!session?.user || (session.user.role !== "STUDENT" && session.user.role !== "ADMIN")) {
         redirect("/login");
     }
     const dbUser = await prisma.user.findUnique({
@@ -18,7 +18,7 @@ export default async function StudentDashboardPage() {
         select: { id: true, role: true, isProfileComplete: true, name: true, hasChangedParentPassword: true, lineUserId: true }
     });
 
-    if (!dbUser || dbUser.role !== "STUDENT") {
+    if (!dbUser || (dbUser.role !== "STUDENT" && dbUser.role !== "ADMIN")) {
         const { redirect } = await import("next/navigation");
         redirect("/api/force-logout");
     }

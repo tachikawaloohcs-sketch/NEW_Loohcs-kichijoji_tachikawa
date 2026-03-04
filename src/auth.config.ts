@@ -99,6 +99,9 @@ export const authConfig: NextAuthConfig = {
             // Dashboard logic
             if (isOnDashboard) {
                 if (isLoggedIn) {
+                    // Admins bypass role restrictions
+                    if (role === "ADMIN") return true;
+
                     // Role Check
                     if (nextUrl.pathname.startsWith("/student") && role !== "STUDENT") return false;
                     if (nextUrl.pathname.startsWith("/instructor") && role !== "INSTRUCTOR") return false;

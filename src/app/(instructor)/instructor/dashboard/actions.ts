@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 // New function for Report Management
 export async function getStudentsForInstructor() {
     const session = await auth();
-    if (session?.user?.role !== "INSTRUCTOR") return [];
+    if (session?.user?.role !== "INSTRUCTOR" && session?.user?.role !== "ADMIN") return [];
 
     // Instructors should see all students to view their past reports history
     return await prisma.user.findMany({
@@ -80,7 +80,7 @@ export async function updateAdmissionResult(studentId: string, results: { school
 // アーカイブ閲覧: 許可されたアーカイブ生徒の取得
 export async function getLicensedArchivedStudents() {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") return [];
+    if (!session?.user?.id || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) return [];
 
     try {
         const accesses = await prisma.archiveAccess.findMany({
@@ -157,7 +157,7 @@ export async function updateStudentProfile(
 // Update Instructor Profile
 export async function updateInstructorProfile(formData: FormData) {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "INSTRUCTOR") {
+    if (!session?.user?.id || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) {
         return { error: "Unauthorized" };
     }
 
