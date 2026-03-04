@@ -58,8 +58,9 @@ const MOCK_HISTORY = [
     }
 ];
 
-export default function LocusPreview() {
-    const [viewMode, setViewMode] = useState<"STUDENT" | "INSTRUCTOR">("STUDENT");
+export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: string }) {
+    const isInstructor = userRole === "INSTRUCTOR" || userRole === "ADMIN";
+    const viewMode = isInstructor ? "INSTRUCTOR" : "STUDENT";
     const [activeTab, setActiveTab] = useState<"TIMELINE" | "SUBMIT" | "PAGES">("TIMELINE");
 
     return (
@@ -112,23 +113,6 @@ export default function LocusPreview() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs text-zinc-500 mr-2">View Mode:</span>
-                        <div className="bg-zinc-900 p-1 rounded flex text-xs font-semibold">
-                            <button
-                                onClick={() => setViewMode("STUDENT")}
-                                className={`px-3 py-1 rounded transition-colors ${viewMode === "STUDENT" ? "bg-zinc-800 text-zinc-100" : "text-zinc-500 hover:text-zinc-300"}`}
-                            >
-                                生徒
-                            </button>
-                            <button
-                                onClick={() => setViewMode("INSTRUCTOR")}
-                                className={`px-3 py-1 rounded transition-colors ${viewMode === "INSTRUCTOR" ? "bg-emerald-900/30 text-emerald-500" : "text-zinc-500 hover:text-zinc-300"}`}
-                            >
-                                講師
-                            </button>
-                        </div>
-                    </div>
                 </header>
 
                 {/* Content Grid */}
@@ -220,6 +204,41 @@ export default function LocusPreview() {
                                         </div>
                                     </div>
 
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="bg-red-950/20 border border-red-900/50 rounded p-4">
+                                        <div className="flex items-start gap-3">
+                                            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="text-zinc-200 font-medium mb-1">【危険度高】仮説が未検証前提に依存</h4>
+                                                <p className="text-red-400/80 text-xs mt-1">
+                                                    「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測。<br />
+                                                    反証となる「若手に任せても動かなかった事例」が無い。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-amber-950/20 border border-amber-900/50 rounded p-4">
+                                        <div className="flex items-start gap-3">
+                                            <GitCommit className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                            <div>
+                                                <h4 className="text-zinc-200 font-medium mb-1">構造停滞: 危機的</h4>
+                                                <p className="text-amber-400/80 text-xs mt-1">
+                                                    「問い」自体が2週間更新されていない。接触は再定義を生んだが、トップの問いに反映されていない。
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-emerald-950/20 border border-emerald-900/50 rounded p-4 mt-8">
+                                        <h4 className="text-emerald-400 font-medium mb-2 text-xs uppercase tracking-widest">Instructor Tools</h4>
+                                        <button className="w-full text-left text-xs p-2 bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 transition">
+                                            + コメント付きで再定義を要求する
+                                        </button>
+                                        <button className="w-full text-left text-xs p-2 mt-2 bg-zinc-900 text-zinc-400 rounded hover:bg-zinc-800 transition">
+                                            + 外部接触のやり直しを指示
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>

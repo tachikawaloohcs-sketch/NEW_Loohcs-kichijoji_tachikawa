@@ -66,10 +66,10 @@ function LoginForm() {
                 <div className="mx-auto w-16 h-16 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
                     <ShieldCheck className="text-primary" size={32} />
                 </div>
-                <CardTitle className="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
-                    Reservation
+                <CardTitle className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-emerald-600 to-blue-500 dark:from-emerald-400 dark:to-blue-300">
+                    Locus
                 </CardTitle>
-                <CardDescription className="text-base font-medium">立川・吉祥寺校 予約システム</CardDescription>
+                <CardDescription className="text-base font-medium">探究・プロジェクト支援システム</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 px-8">
                 {!isAdminMode ? (

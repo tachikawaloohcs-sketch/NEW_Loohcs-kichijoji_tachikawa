@@ -50,7 +50,7 @@ export default function SetupProfileClient({ user }: { user: User }) {
             <CardHeader className="text-center space-y-2">
                 <CardTitle className="text-3xl font-bold tracking-tight text-primary">アカウント設定</CardTitle>
                 <CardDescription className="text-base">
-                    予約システムを利用するために、プロフィールを完成させましょう。
+                    Locusシステムを利用するために、プロフィールを完成させましょう。
                 </CardDescription>
             </CardHeader>
             <form action={action}>
