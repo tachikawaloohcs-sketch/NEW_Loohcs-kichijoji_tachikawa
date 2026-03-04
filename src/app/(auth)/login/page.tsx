@@ -96,10 +96,10 @@ function LoginForm() {
                         <div className="pt-2 flex justify-center">
                             <button
                                 onClick={() => setIsAdminMode(true)}
-                                className="group flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-primary transition-all"
+                                className="group flex flex-col items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-primary transition-all"
                             >
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-primary transition-colors" />
-                                保護者・管理者はこちら（メールアドレス）
+                                <span>保護者・管理者の方はこちら</span>
+                                <span>または メールアドレスでログインする</span>
                             </button>
                         </div>
 
@@ -123,7 +123,7 @@ function LoginForm() {
                                     type="email"
                                     name="email"
                                     required
-                                    placeholder="admin@example.com"
+                                    placeholder="mail@example.com"
                                     className="h-11 rounded-xl border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-950/50 focus:ring-2 focus:ring-primary/20 transition-all"
                                 />
                             </div>
