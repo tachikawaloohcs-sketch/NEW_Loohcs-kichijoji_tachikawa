@@ -194,97 +194,34 @@ export default function LocusPreview() {
                                         </div>
                                     </div>
 
-                                    {/* 新規追加: 次回授業での具体アクション提案 */}
+                                    {/* AIによる反論 (AI Refutation) */}
                                     <div>
                                         <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <Sparkles className="w-4 h-4" /> AI 次回アクション提案 (Next Step)
+                                            <Sparkles className="w-4 h-4" /> AIからの反論 (AI Refutation)
                                         </h4>
                                         <div className="bg-zinc-900/50 border border-emerald-900/50 rounded p-4">
-                                            <p className="text-emerald-400 text-xs font-bold mb-2">次回の授業までに以下を行うと構造が強固になります：</p>
-                                            <ul className="space-y-2 text-zinc-300 text-xs leading-relaxed">
-                                                <li className="flex items-start gap-2">
+                                            <p className="text-emerald-400 text-xs font-bold mb-2">あなたの仮説に対して、以下のような反証や別の視点が存在します：</p>
+                                            <ul className="space-y-3 text-zinc-300 text-xs leading-relaxed">
+                                                <li className="flex items-start gap-2 border-b border-zinc-800/50 pb-3">
                                                     <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                                    <span>「権限」の定義を絞る（例：予算決裁権、イベント企画権など）。</span>
+                                                    <div>
+                                                        <strong className="text-zinc-200 block mb-1">【反論】権限移譲だけでは解決しないケース</strong>
+                                                        <span>「任せても若手が動かない・失敗する」事例が多数存在します。例えば、〇〇市の調査(田中, 2022)では、権限だけを渡して資金やノウハウの支援を行わなかった結果、若手組織が空中分解したと報告されています。「権限移譲＝成功」は飛躍ではないでしょうか？</span>
+                                                    </div>
                                                 </li>
                                                 <li className="flex items-start gap-2">
                                                     <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                                    <span>実際に「権限移譲」が行われて成功した他都市の事例（例：〇〇市の事例）を調査し、なぜ彼らはできたのか？を調べる。</span>
+                                                    <div>
+                                                        <strong className="text-zinc-200 block mb-1">【反論】「会長側の問題」と断定する危険性</strong>
+                                                        <span>若手が「口出しされて面倒だから」と言っているのは、事実ではなく「言い訳（防衛機制）」である可能性はないでしょうか？ 心理学研究(鈴木, 2019)では、失敗を恐れる層が「環境のせい」にする傾向が指摘されています。権限以外の要因（若手のスキル不足など）は排除できますか？</span>
+                                                    </div>
                                                 </li>
                                             </ul>
                                         </div>
                                     </div>
 
-                                    {/* 3. 映像授業レコメンド / Recommendations */}
-                                    <div>
-                                        <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <BrainCircuit className="w-4 h-4" /> AI レコメンド教材 (Study)
-                                        </h4>
-                                        <div className="bg-emerald-950/10 border border-emerald-900/30 p-3 rounded space-y-3">
-                                            <p className="text-xs text-emerald-500/80 mb-2">現在のつまずき（前提の甘さ・概念定義）に対応する教材です：</p>
-
-                                            <div className="flex items-center gap-3 group cursor-pointer bg-zinc-950/50 p-2 rounded border border-emerald-900/20 hover:border-emerald-500/50 transition">
-                                                <div className="w-10 h-10 rounded bg-emerald-900/40 flex items-center justify-center shrink-0 group-hover:bg-emerald-800 transition">
-                                                    <Video className="w-5 h-5 text-emerald-400" />
-                                                </div>
-                                                <div>
-                                                    <h5 className="text-emerald-300 text-xs font-bold font-sans">第4回:「前提」を疑う技術</h5>
-                                                    <span className="text-emerald-500/70 text-[10px]">仮説構築マスタークラス (12分)</span>
-                                                </div>
-                                                <PlayCircle className="w-4 h-4 text-emerald-500 ml-auto opacity-0 group-hover:opacity-100 transition" />
-                                            </div>
-
-                                            <div className="flex items-center gap-3 group cursor-pointer bg-zinc-950/50 p-2 rounded border border-emerald-900/20 hover:border-emerald-500/50 transition">
-                                                <div className="w-10 h-10 rounded bg-emerald-900/40 flex items-center justify-center shrink-0 group-hover:bg-emerald-800 transition">
-                                                    <Video className="w-5 h-5 text-emerald-400" />
-                                                </div>
-                                                <div>
-                                                    <h5 className="text-emerald-300 text-xs font-bold font-sans">【事例研究】地域創生と落とし穴</h5>
-                                                    <span className="text-emerald-500/70 text-[10px]">社会課題アプローチ (25分)</span>
-                                                </div>
-                                                <PlayCircle className="w-4 h-4 text-emerald-500 ml-auto opacity-0 group-hover:opacity-100 transition" />
-                                            </div>
-
-                                        </div>
-                                    </div>
-
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="bg-red-950/20 border border-red-900/50 rounded p-4">
-                                        <div className="flex items-start gap-3">
-                                            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                                            <div>
-                                                <h4 className="text-zinc-200 font-medium mb-1">【危険度高】仮説が未検証前提に依存</h4>
-                                                <p className="text-red-400/80 text-xs mt-1">
-                                                    「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測。<br />
-                                                    反証となる「若手に任せても動かなかった事例」が無い。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-amber-950/20 border border-amber-900/50 rounded p-4">
-                                        <div className="flex items-start gap-3">
-                                            <GitCommit className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                            <div>
-                                                <h4 className="text-zinc-200 font-medium mb-1">構造停滞: 危機的</h4>
-                                                <p className="text-amber-400/80 text-xs mt-1">
-                                                    「問い」自体が2週間更新されていない。接触は再定義を生んだが、トップの問いに反映されていない。
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="bg-emerald-950/20 border border-emerald-900/50 rounded p-4 mt-8">
-                                        <h4 className="text-emerald-400 font-medium mb-2 text-xs uppercase tracking-widest">Instructor Tools</h4>
-                                        <button className="w-full text-left text-xs p-2 bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 transition">
-                                            + コメント付きで再定義を要求する
-                                        </button>
-                                        <button className="w-full text-left text-xs p-2 mt-2 bg-zinc-900 text-zinc-400 rounded hover:bg-zinc-800 transition">
-                                            + 外部接触のやり直しを指示
-                                        </button>
-                                    </div>
                                 </div>
                             )}
-
                         </div>
                     </aside>
                 </div>
