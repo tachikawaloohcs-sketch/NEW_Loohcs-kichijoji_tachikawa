@@ -53,7 +53,22 @@ export default async function Home() {
           </p>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mt-8">
+          {/* Locus System Card */}
+          <div className="">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer border-t-4 border-emerald-500 h-full bg-emerald-50/30 dark:bg-emerald-950/20">
+              <CardHeader>
+                <CardTitle className="text-emerald-700 dark:text-emerald-400">Locus</CardTitle>
+                <CardDescription>探究・プロジェクト支援画面へ</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Link href="/locus">Locusを開く</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
           <div className={isDisabled("STUDENT") ? "opacity-50" : ""}>
             <Card className="hover:shadow-lg transition-shadow cursor-pointer border-t-4 border-primary h-full">
               <CardHeader>
