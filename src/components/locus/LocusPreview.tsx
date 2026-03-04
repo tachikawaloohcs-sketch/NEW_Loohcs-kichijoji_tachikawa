@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import Link from "next/link";
+import { generateRefutation } from "@/app/locus/actions";
 
 // ========== Mock Data ==========
 const MOCK_HISTORY = [
@@ -63,6 +65,30 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
     const viewMode = isInstructor ? "INSTRUCTOR" : "STUDENT";
     const [activeTab, setActiveTab] = useState<"TIMELINE" | "SUBMIT" | "PAGES">("TIMELINE");
 
+    const [isGeneratingRefutation, setIsGeneratingRefutation] = useState(false);
+    const [aiRefutations, setAiRefutations] = useState<{ title: string; content: string }[] | null>(null);
+    const [aiError, setAiError] = useState<string | null>(null);
+
+    const handleGenerateRefutation = async () => {
+        setIsGeneratingRefutation(true);
+        setAiError(null);
+        try {
+            // Get data from the latest active record (mocked here, index 1 is newest in MOCK)
+            const latestRecord = MOCK_HISTORY[1];
+            const response = await generateRefutation(latestRecord.hypothesis, latestRecord.premises);
+
+            if (response.error) {
+                setAiError(response.error);
+            } else if (response.refutations) {
+                setAiRefutations(response.refutations);
+            }
+        } catch (error) {
+            setAiError("エラーが発生しました。時間を置いて再度お試しください。");
+        } finally {
+            setIsGeneratingRefutation(false);
+        }
+    };
+
     return (
         <div className="flex h-screen overflow-hidden bg-zinc-950 text-zinc-300 font-mono text-sm leading-relaxed">
             {/* Sidebar / Left Navigation */}
@@ -85,6 +111,16 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
                     <button className="w-full text-left px-3 py-2 mt-2 hover:bg-zinc-900/50 rounded text-zinc-500 hover:text-zinc-300 transition-colors">
                         + 新規テーマ凍結解除
                     </button>
+                </div>
+
+                <div className="p-4 mt-auto border-t border-zinc-800">
+                    <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Study Materials</div>
+                    <Link href="/student/eiken" className="w-full text-left px-3 py-2 hover:bg-zinc-900/50 rounded text-zinc-400 hover:text-blue-400 transition-colors flex items-center gap-2">
+                        <BrainCircuit className="w-4 h-4" /> 英検 特訓ルーム
+                    </Link>
+                    <Link href="/student/essay" className="w-full text-left px-3 py-2 mt-1 hover:bg-zinc-900/50 rounded text-zinc-400 hover:text-rose-400 transition-colors flex items-center gap-2">
+                        <PenTool className="w-4 h-4" /> 小論文 Locus
+                    </Link>
                 </div>
             </aside>
 
@@ -184,23 +220,42 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
                                             <Sparkles className="w-4 h-4" /> AIからの反論 (AI Refutation)
                                         </h4>
                                         <div className="bg-zinc-900/50 border border-emerald-900/50 rounded p-4">
-                                            <p className="text-emerald-400 text-xs font-bold mb-2">あなたの仮説に対して、以下のような反証や別の視点が存在します：</p>
-                                            <ul className="space-y-3 text-zinc-300 text-xs leading-relaxed">
-                                                <li className="flex items-start gap-2 border-b border-zinc-800/50 pb-3">
-                                                    <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <strong className="text-zinc-200 block mb-1">【反論】権限移譲だけでは解決しないケース</strong>
-                                                        <span>「任せても若手が動かない・失敗する」事例が多数存在します。例えば、〇〇市の調査(田中, 2022)では、権限だけを渡して資金やノウハウの支援を行わなかった結果、若手組織が空中分解したと報告されています。「権限移譲＝成功」は飛躍ではないでしょうか？</span>
-                                                    </div>
-                                                </li>
-                                                <li className="flex items-start gap-2">
-                                                    <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <strong className="text-zinc-200 block mb-1">【反論】「会長側の問題」と断定する危険性</strong>
-                                                        <span>若手が「口出しされて面倒だから」と言っているのは、事実ではなく「言い訳（防衛機制）」である可能性はないでしょうか？ 心理学研究(鈴木, 2019)では、失敗を恐れる層が「環境のせい」にする傾向が指摘されています。権限以外の要因（若手のスキル不足など）は排除できますか？</span>
-                                                    </div>
-                                                </li>
-                                            </ul>
+                                            {aiRefutations ? (
+                                                <>
+                                                    <p className="text-emerald-400 text-xs font-bold mb-3">学術論拠に基づく反証観点：</p>
+                                                    <ul className="space-y-4 text-zinc-300 text-xs leading-relaxed">
+                                                        {aiRefutations.map((ref, idx) => (
+                                                            <li key={idx} className="flex items-start gap-3 border-b border-zinc-800/50 pb-3 last:border-0 last:pb-0">
+                                                                <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                                                <div>
+                                                                    <strong className="text-zinc-100 block mb-1.5">{ref.title}</strong>
+                                                                    <span className="text-zinc-400 leading-loose">{ref.content}</span>
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </>
+                                            ) : (
+                                                <div className="text-center py-4 space-y-3">
+                                                    <p className="text-xs text-zinc-400">現在の仮説に対して、学術的な先行研究に基づく厳しい反証を行います。</p>
+
+                                                    {aiError && (
+                                                        <p className="text-xs text-rose-400 bg-rose-950/30 p-2 rounded">{aiError}</p>
+                                                    )}
+
+                                                    <Button
+                                                        onClick={handleGenerateRefutation}
+                                                        disabled={isGeneratingRefutation}
+                                                        className="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-100 transition-colors h-10 border border-emerald-800/50 shadow-inner"
+                                                    >
+                                                        {isGeneratingRefutation ? (
+                                                            <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> 反論生成中...</>
+                                                        ) : (
+                                                            <><BrainCircuit className="w-4 h-4 mr-2" /> 学術論文から反証を出力する</>
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
