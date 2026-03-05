@@ -459,6 +459,18 @@ function TimelineView({ history }: { history: any[] }) {
 }
 
 function SubmissionForm() {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSuccess, setIsSuccess] = useState(false);
+
+    const handleSubmit = () => {
+        setIsSubmitting(true);
+        setTimeout(() => {
+            setIsSubmitting(false);
+            setIsSuccess(true);
+            setTimeout(() => setIsSuccess(false), 3000);
+        }, 1500);
+    };
+
     return (
         <div className="max-w-3xl mx-auto pb-24">
             <h2 className="text-2xl font-bold text-zinc-100 mb-2 flex items-center gap-3">
@@ -584,8 +596,18 @@ function SubmissionForm() {
                 </fieldset>
 
                 <div className="pt-4 flex justify-end">
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8">
-                        Commit Update (送信)
+                    <Button
+                        onClick={handleSubmit}
+                        disabled={isSubmitting || isSuccess}
+                        className={`px-8 transition-all ${isSuccess ? "bg-emerald-500 hover:bg-emerald-500 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                    >
+                        {isSubmitting ? (
+                            <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> 送信中...</>
+                        ) : isSuccess ? (
+                            <><CheckCircle2 className="w-4 h-4 mr-2" /> 送信完了</>
+                        ) : (
+                            "Commit Update (送信)"
+                        )}
                     </Button>
                 </div>
 
