@@ -69,13 +69,15 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
     const [aiRefutations, setAiRefutations] = useState<{ title: string; content: string }[] | null>(null);
     const [aiError, setAiError] = useState<string | null>(null);
 
-    const handleGenerateRefutation = async () => {
+    const [history, setHistory] = useState(MOCK_HISTORY);
+
+    const handleGenerateRefutation = async (record?: any) => {
         setIsGeneratingRefutation(true);
         setAiError(null);
         try {
-            // Get data from the latest active record (mocked here, index 1 is newest in MOCK)
-            const latestRecord = MOCK_HISTORY[1];
-            const response = await generateRefutation(latestRecord.hypothesis, latestRecord.premises);
+            // Use the passed record or defaults to the latest active record
+            const targetRecord = record || history[history.length - 1];
+            const response = await generateRefutation(targetRecord.hypothesis, targetRecord.premises);
 
             if (response.error) {
                 setAiError(response.error);
@@ -156,9 +158,19 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
 
                     {/* Left Column: Dynamic Content based on Tab */}
                     <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-                        {activeTab === "TIMELINE" && <TimelineView history={MOCK_HISTORY} />}
-                        {activeTab === "SUBMIT" && <SubmissionForm />}
-                        {activeTab === "PAGES" && <FivePagesGenerator history={MOCK_HISTORY} />}
+                        {activeTab === "TIMELINE" && <TimelineView history={history} />}
+                        {activeTab === "SUBMIT" && (
+                            <SubmissionForm
+                                onPushRecord={(newRecord) => {
+                                    const nextHistory = [...history, newRecord];
+                                    setHistory(nextHistory);
+                                    setActiveTab("TIMELINE");
+                                    handleGenerateRefutation(newRecord);
+                                }}
+                                lastRecord={history[history.length - 1]}
+                            />
+                        )}
+                        {activeTab === "PAGES" && <FivePagesGenerator history={history} />}
                     </div>
 
                     {/* Right Column: Always Display Weakness Analyzer */}
@@ -244,7 +256,7 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
                                                     )}
 
                                                     <Button
-                                                        onClick={handleGenerateRefutation}
+                                                        onClick={() => handleGenerateRefutation()}
                                                         disabled={isGeneratingRefutation}
                                                         className="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-100 transition-colors h-10 border border-emerald-800/50 shadow-inner"
                                                     >
@@ -458,21 +470,48 @@ function TimelineView({ history }: { history: any[] }) {
     );
 }
 
-function SubmissionForm() {
+function SubmissionForm({ onPushRecord, lastRecord }: { onPushRecord: (rec: any) => void; lastRecord: any }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
+    const [contactType, setContactType] = useState("PREPARATION");
 
-    const handleSubmit = () => {
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
         setIsSubmitting(true);
+
+        const form = new FormData(e.currentTarget);
+
+        const newRecord = {
+            id: `rec_${Date.now()}`,
+            classNum: lastRecord.classNum + 1,
+            date: format(new Date(), "yyyy-MM-dd"),
+            question: form.get("question") as string,
+            questionChanged: form.get("q_changed") === "on",
+            hypothesis: form.get("hypothesis") as string,
+            evidences: [(form.get("evidence") as string) || "未入力"],
+            premises: [(form.get("premise") as string) || "未入力"],
+            contact: {
+                type: contactType,
+                target: form.get("target"),
+                purpose: form.get("purpose"),
+                expectedRefutation: form.get("expectedRefutation"),
+                feedback: form.get("feedback"),
+                brokenLink: form.get("brokenLink"),
+                fixPlan: null
+            },
+            redefinition: form.get("redefinition") as string || null,
+            studentReflection: form.get("studentReflection") as string,
+            nextAction: form.get("nextAction") as string,
+            instructorComment: null
+        };
+
         setTimeout(() => {
             setIsSubmitting(false);
-            setIsSuccess(true);
-            setTimeout(() => setIsSuccess(false), 3000);
-        }, 1500);
+            onPushRecord(newRecord);
+        }, 1000);
     };
 
     return (
-        <div className="max-w-3xl mx-auto pb-24">
+        <form onSubmit={handleSubmit} className="max-w-3xl mx-auto pb-24">
             <h2 className="text-2xl font-bold text-zinc-100 mb-2 flex items-center gap-3">
                 <GitCommit className="w-6 h-6 text-emerald-500" />
                 Class Update Submission (レコード更新)
@@ -489,10 +528,10 @@ function SubmissionForm() {
                     <div className="space-y-4">
                         <div>
                             <Label className="text-zinc-400">現在の問い</Label>
-                            <Input defaultValue="地方都市のシャッター街はなぜ甦らないのか？" className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" />
+                            <Input name="question" defaultValue={lastRecord.question} className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" />
                         </div>
                         <div className="flex items-center gap-2 text-sm text-zinc-400">
-                            <input type="checkbox" id="q_changed" className="rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-emerald-500" />
+                            <input type="checkbox" name="q_changed" id="q_changed" className="rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-emerald-500" />
                             <label htmlFor="q_changed">前回から問いを変更した</label>
                         </div>
                     </div>
@@ -506,17 +545,17 @@ function SubmissionForm() {
                     <div className="space-y-4">
                         <div>
                             <Label className="text-zinc-400">仮説 (1〜3行)</Label>
-                            <Textarea rows={2} className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="この問いに対する現時点での答え..." />
+                            <Textarea name="hypothesis" required rows={2} className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="この問いに対する現時点での答え..." />
                         </div>
                         <div>
                             <Label className="text-zinc-400">その根拠 (最低1つ)</Label>
-                            <Input className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 font-mono text-xs" placeholder="先行研究, インタビュー結果, データなど" />
+                            <Input name="evidence" required className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100 font-mono text-xs" placeholder="先行研究, インタビュー結果, データなど" />
                         </div>
                         <div>
                             <Label className="text-zinc-400 flex items-center gap-2">
                                 未検証前提 (最低1つ) <ShieldAlert className="w-3 h-3 text-red-500" />
                             </Label>
-                            <Input className="mt-1 bg-zinc-950 border-red-900/50 text-zinc-100 font-mono text-xs" placeholder="この仮説が成立するために「本当か？」と疑うべき前提" />
+                            <Input name="premise" required className="mt-1 bg-zinc-950 border-red-900/50 text-zinc-100 font-mono text-xs" placeholder="この仮説が成立するために「本当か？」と疑うべき前提" />
                         </div>
                     </div>
                 </fieldset>
@@ -527,7 +566,7 @@ function SubmissionForm() {
                         Step 3: 外部接触 (Collision Node)
                     </legend>
 
-                    <Tabs defaultValue="prep" className="w-full">
+                    <Tabs value={contactType === "PREPARATION" ? "prep" : "refle"} onValueChange={(v) => setContactType(v === "prep" ? "PREPARATION" : "REFLECTION")} className="w-full">
                         <TabsList className="grid w-full grid-cols-2 bg-zinc-950 border border-zinc-800 mb-6">
                             <TabsTrigger value="prep" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-500">A. 接触準備</TabsTrigger>
                             <TabsTrigger value="refle" className="data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 text-zinc-500">B. 接触振り返り</TabsTrigger>
@@ -537,15 +576,15 @@ function SubmissionForm() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label className="text-zinc-400">誰に (Target)</Label>
-                                    <Input className="bg-zinc-950 border-zinc-800" />
+                                    <Input name="target" className="bg-zinc-950 border-zinc-800" />
                                 </div>
                                 <div>
                                     <Label className="text-zinc-400">何を確かめるか (Purpose)</Label>
-                                    <Input className="bg-zinc-950 border-zinc-800" />
+                                    <Input name="purpose" className="bg-zinc-950 border-zinc-800" />
                                 </div>
                                 <div className="col-span-2">
                                     <Label className="text-zinc-400">想定反論 (Expected Refutation)</Label>
-                                    <Textarea rows={2} className="bg-zinc-950 border-zinc-800" placeholder="相手からこう否定されるだろう..." />
+                                    <Textarea name="expectedRefutation" rows={2} className="bg-zinc-950 border-zinc-800" placeholder="相手からこう否定されるだろう..." />
                                 </div>
                             </div>
                         </TabsContent>
@@ -553,11 +592,11 @@ function SubmissionForm() {
                         <TabsContent value="refle" className="space-y-4">
                             <div>
                                 <Label className="text-zinc-400">何を言われたか (Feedback)</Label>
-                                <Textarea rows={2} className="bg-zinc-950 border-zinc-800" />
+                                <Textarea name="feedback" rows={2} className="bg-zinc-950 border-zinc-800" />
                             </div>
                             <div>
                                 <Label className="text-red-400 text-xs">何が崩れたか (Broken Frame)</Label>
-                                <Input className="bg-zinc-950 border-red-900/30 text-zinc-100" />
+                                <Input name="brokenLink" className="bg-zinc-950 border-red-900/30 text-zinc-100" />
                             </div>
                         </TabsContent>
                     </Tabs>
@@ -570,7 +609,7 @@ function SubmissionForm() {
                     </legend>
                     <div>
                         <Label className="text-emerald-400/80 text-xs">(※あれば) 外部接触を経て、仮説や問いはどう進化したか？</Label>
-                        <Textarea rows={3} className="mt-1 bg-zinc-950 border-emerald-900/50 text-emerald-100 placeholder:text-zinc-700" placeholder="曖昧だった〇〇という概念を棄却し、△△に焦点を絞ることにした。" />
+                        <Textarea name="redefinition" rows={3} className="mt-1 bg-zinc-950 border-emerald-900/50 text-emerald-100 placeholder:text-zinc-700" placeholder="曖昧だった〇〇という概念を棄却し、△△に焦点を絞ることにした。" />
                     </div>
                 </fieldset>
 
@@ -584,27 +623,25 @@ function SubmissionForm() {
                             <Label className="text-zinc-400 flex items-center gap-2">
                                 <PenTool className="w-4 h-4" /> 本日の授業の振り返り (気づき、反省点など)
                             </Label>
-                            <Textarea rows={2} className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="自分の思考のクセや、やってみてわかったことなど" />
+                            <Textarea name="studentReflection" required rows={2} className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="自分の思考のクセや、やってみてわかったことなど" />
                         </div>
                         <div>
                             <Label className="text-zinc-400 flex items-center gap-2">
                                 <ArrowRightCircle className="w-4 h-4 text-emerald-500" /> 次回の授業までに何をするか？ (行動計画)
                             </Label>
-                            <Input className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="例：〇〇の論文を読む。〇〇さんにインタビューのアポを取る" />
+                            <Input name="nextAction" required className="mt-1 bg-zinc-950 border-zinc-800 text-zinc-100" placeholder="例：〇〇の論文を読む。〇〇さんにインタビューのアポを取る" />
                         </div>
                     </div>
                 </fieldset>
 
                 <div className="pt-4 flex justify-end">
                     <Button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting || isSuccess}
-                        className={`px-8 transition-all ${isSuccess ? "bg-emerald-500 hover:bg-emerald-500 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="px-8 transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
                     >
                         {isSubmitting ? (
                             <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> 送信中...</>
-                        ) : isSuccess ? (
-                            <><CheckCircle2 className="w-4 h-4 mr-2" /> 送信完了</>
                         ) : (
                             "Commit Update (送信)"
                         )}
@@ -612,7 +649,7 @@ function SubmissionForm() {
                 </div>
 
             </div>
-        </div>
+        </form>
     );
 }
 
