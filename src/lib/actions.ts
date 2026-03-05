@@ -20,7 +20,12 @@ export async function authenticate(prevState: string | undefined, formData: Form
             return "このアカウントは現在無効化されています。管理者に連絡してください。";
         }
 
-        const redirectUrl = "/";
+        let redirectUrl = "/";
+        if (user?.role === "ADMIN") {
+            redirectUrl = "/admin/dashboard";
+        } else if (user?.role === "PARENT") {
+            redirectUrl = "/parent/dashboard";
+        }
 
         await signIn("credentials", formData, { redirectTo: redirectUrl });
     } catch (error) {
@@ -36,7 +41,15 @@ export async function authenticate(prevState: string | undefined, formData: Form
         // Force redirect to "/" to override any callbackUrl behaviors in NextAuth
         if (error && typeof error === 'object' && 'digest' in error && typeof (error as any).digest === 'string' && (error as any).digest.startsWith('NEXT_REDIRECT')) {
             const { redirect } = await import("next/navigation");
-            redirect("/");
+            // Determine redirect URL from error if possible, or fallback to role-based
+            const email = formData.get("email") as string;
+            const user = await prisma.user.findUnique({ where: { email } });
+
+            let finalRedirectUrl = "/";
+            if (user?.role === "ADMIN") finalRedirectUrl = "/admin/dashboard";
+            else if (user?.role === "PARENT") finalRedirectUrl = "/parent/dashboard";
+
+            redirect(finalRedirectUrl);
         }
         throw error;
     }
