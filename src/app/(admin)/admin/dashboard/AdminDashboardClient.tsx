@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, FileText, Settings, Archive } from "lucide-react";
+import { Users, FileText, Settings, Archive, Sparkles } from "lucide-react";
 import { CarteViewer } from "@/components/dashboard/CarteViewer";
+import AiMaterialGenerator from "@/components/admin/AiMaterialGenerator";
 
 // We keep the bare minimum components since reservation system is gone.
 // We'd have subcomponents for User management, settings, but for the sake of compiling, I'll mock them or put them if needed.
@@ -42,6 +43,10 @@ export default function AdminDashboardClient({
                         <Settings className="w-4 h-4 mr-2" />
                         <span className="hidden sm:inline">システム設定</span>
                     </TabsTrigger>
+                    <TabsTrigger value="ai" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg transition-all text-emerald-600 font-bold border border-emerald-100">
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">AI教材作成</span>
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="cartes" className="space-y-4">
@@ -60,6 +65,10 @@ export default function AdminDashboardClient({
                         <h2 className="text-xl font-bold text-[#004661] mb-6">システム全般設定</h2>
                         <p className="text-slate-500">設定は現在メンテナンス中です。</p>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="ai">
+                    <AiMaterialGenerator />
                 </TabsContent>
             </Tabs>
         </div>
