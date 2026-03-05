@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 
 export default async function InstructorDashboardPage() {
     const session = await auth();
-    console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id);
+    console.log("DEBUG PAGE:", session?.user?.email, session?.user?.id);
 
-    if (!session?.user || (session.user.role !== "INSTRUCTOR" && session.user.role !== "ADMIN")) {
+    if (!session?.user?.id) {
         redirect("/login");
     }
 

@@ -9,19 +9,14 @@ import { prisma } from '@/lib/prisma';
 
 export default async function ParentDashboardPage() {
     const session = await auth();
-    if (!session || session.user.role !== 'PARENT') {
-        // 保護者または管理者のみ許可
-        if (session?.user?.role !== 'ADMIN') {
-            redirect('/login');
-        }
+    if (!session?.user?.id) {
+        redirect('/login');
     }
 
-    if (session?.user?.id) {
-        const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
-        if (!dbUser) {
-            const { redirect } = await import("next/navigation");
-            redirect("/api/force-logout");
-        }
+    const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!dbUser || (dbUser.role !== 'PARENT' && dbUser.role !== 'ADMIN')) {
+        const { redirect } = await import("next/navigation");
+        redirect("/api/force-logout");
     }
 
     const { error, children } = await getParentDashboardData();

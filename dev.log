@@ -1,0 +1,146 @@
+
+> reservation-site@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.84:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 805ms
+ GET /admin/dashboard 200 in 507ms (compile: 348ms, render: 159ms)
+ GET /admin/dashboard 200 in 23ms (compile: 1990µs, render: 21ms)
+ HEAD /admin/dashboard 200 in 35ms (compile: 6ms, render: 29ms)
+ GET /admin/dashboard 200 in 29ms (compile: 3ms, render: 26ms)
+ GET /admin/dashboard 200 in 36ms (compile: 8ms, render: 28ms)
+DEBUG PAGE: Session: undefined undefined undefined
+ GET /instructor/dashboard 200 in 958ms (compile: 877ms, render: 80ms)
+ GET /login 200 in 511ms (compile: 465ms, render: 46ms)
+ GET /api/auth/session 200 in 1754ms (compile: 1735ms, render: 19ms)
+ GET /api/auth/session 200 in 10ms (compile: 4ms, render: 6ms)
+⨯ Error [PrismaClientInitializationError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findUnique()` invocation in
+/Users/yamamotokousuke/Desktop/carte-system final/.next/dev/server/chunks/ssr/[root-of-the-server]__4942a364._.js:388:160
+
+  385 async function authenticate(prevState, formData) {
+  386     const email = formData.get("email");
+  387     try {
+→ 388         const user = await {imported module ./src/lib/prisma.ts}["prisma"].user.findUnique(
+Can't reach database server at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`
+
+Please make sure your database server is running at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`.
+    at <unknown> (src/lib/actions.ts:13:40)
+    at async authenticate (src/lib/actions.ts:13:22)
+  11 |
+  12 |     try {
+> 13 |         const user = await prisma.user.findUnique({ where: { email } });
+     |                                        ^
+  14 |         // Let signIn handle the password validation failure, but if user implies role...
+  15 |         // Actually, better to just redirect to root and let middleware handle it if we can't find user
+  16 |         // But here we want explicit redirect. {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '2462261120'
+}
+ POST /login 500 in 30.4s (compile: 15ms, render: 30.4s)
+ GET /login 200 in 104ms (compile: 13ms, render: 91ms)
+ GET /api/auth/session 200 in 27ms (compile: 13ms, render: 14ms)
+ GET /api/auth/session 200 in 6ms (compile: 1947µs, render: 4ms)
+⨯ Error [PrismaClientInitializationError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findUnique()` invocation in
+/Users/yamamotokousuke/Desktop/carte-system final/.next/dev/server/chunks/ssr/[root-of-the-server]__4942a364._.js:388:160
+
+  385 async function authenticate(prevState, formData) {
+  386     const email = formData.get("email");
+  387     try {
+→ 388         const user = await {imported module ./src/lib/prisma.ts}["prisma"].user.findUnique(
+Can't reach database server at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`
+
+Please make sure your database server is running at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`.
+    at <unknown> (src/lib/actions.ts:13:40)
+    at async authenticate (src/lib/actions.ts:13:22)
+  11 |
+  12 |     try {
+> 13 |         const user = await prisma.user.findUnique({ where: { email } });
+     |                                        ^
+  14 |         // Let signIn handle the password validation failure, but if user implies role...
+  15 |         // Actually, better to just redirect to root and let middleware handle it if we can't find user
+  16 |         // But here we want explicit redirect. {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '2462261120'
+}
+ POST /login 500 in 30.3s (compile: 10ms, render: 30.3s)
+ GET /admin/dashboard 200 in 79ms (compile: 7ms, render: 72ms)
+ GET /api/auth/session 200 in 15ms (compile: 4ms, render: 10ms)
+ GET /login 200 in 78ms (compile: 2ms, render: 76ms)
+ GET /api/auth/session 200 in 32ms (compile: 13ms, render: 19ms)
+ GET /api/auth/session 200 in 5ms (compile: 1651µs, render: 3ms)
+ GET / 200 in 456ms (compile: 333ms, render: 124ms)
+ GET /api/auth/session 200 in 15ms (compile: 7ms, render: 8ms)
+ GET /api/auth/session 200 in 7ms (compile: 2ms, render: 5ms)
+✓ Compiled in 393ms
+ GET / 200 in 95ms (compile: 6ms, render: 89ms)
+⨯ Error [PrismaClientInitializationError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findMany()` invocation in
+/Users/yamamotokousuke/Desktop/carte-system final/.next/dev/server/chunks/ssr/[root-of-the-server]__cc6445ca._.js:90:141
+
+  87 // }
+  88 // Fetch all students with reports directly using studentReports now
+  89 const [studentsWithReports, allUsers, deadlineSetting] = await Promise.all([
+→ 90     {imported module ./src/lib/prisma.ts}["prisma"].user.findMany(
+Can't reach database server at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`
+
+Please make sure your database server is running at `db.gubmbkybqkmyrzdtheya.supabase.co:5432`.
+    at <unknown> (src/app/(admin)/admin/dashboard/page.tsx:27:21)
+    at async AdminDashboardPage (src/app/(admin)/admin/dashboard/page.tsx:26:62)
+  25 |     // Fetch all students with reports directly using studentReports now
+  26 |     const [studentsWithReports, allUsers, deadlineSetting] = await Promise.all([
+> 27 |         prisma.user.findMany({
+     |                     ^
+  28 |             where: { role: "STUDENT" },
+  29 |             include: {
+  30 |                 studentReports: { {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '3601427829'
+}
+ GET /admin/dashboard 200 in 30.3s (compile: 181ms, render: 30.1s)
+⨯ Error [PrismaClientInitializationError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findMany()` invocation in
+/Users/yamamotokousuke/Desktop/carte-system final/.next/dev/server/chunks/ssr/[root-of-the-server]__cc6445ca._.js:90:141
+
+  87 // }
+  88 // Fetch all students with reports directly using studentReports now
+  89 const [studentsWithReports, allUsers, deadlineSetting] = await Promise.all([
+→ 90     {imported module ./src/lib/prisma.ts}["prisma"].user.findMany(
+Timed out fetching a new connection from the connection pool. More info: http://pris.ly/d/connection-pool (Current connection pool timeout: 30, connection limit: 17)
+    at <unknown> (src/app/(admin)/admin/dashboard/page.tsx:27:21)
+    at async AdminDashboardPage (src/app/(admin)/admin/dashboard/page.tsx:26:62)
+  25 |     // Fetch all students with reports directly using studentReports now
+  26 |     const [studentsWithReports, allUsers, deadlineSetting] = await Promise.all([
+> 27 |         prisma.user.findMany({
+     |                     ^
+  28 |             where: { role: "STUDENT" },
+  29 |             include: {
+  30 |                 studentReports: { {
+  clientVersion: '6.19.2',
+  errorCode: undefined,
+  retryable: undefined,
+  digest: '2926102133'
+}
+ GET /admin/dashboard 200 in 30.1s (compile: 5ms, render: 30.1s)
+✓ Compiled in 143ms
+ GET / 200 in 37ms (compile: 6ms, render: 32ms)
+✓ Compiled in 70ms
+ GET / 200 in 38ms (compile: 8ms, render: 30ms)
+ GET / 200 in 25ms (compile: 3ms, render: 22ms)
+✓ Compiled in 39ms
+ GET / 200 in 314ms (compile: 75ms, render: 238ms)
+ GET / 200 in 194ms (compile: 2ms, render: 192ms)
+ GET / 200 in 175ms (compile: 3ms, render: 172ms)
+ GET / 200 in 35ms (compile: 17ms, render: 19ms)

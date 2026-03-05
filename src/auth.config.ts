@@ -102,11 +102,11 @@ export const authConfig: NextAuthConfig = {
                     // Admins bypass role restrictions
                     if (role === "ADMIN") return true;
 
-                    // Role Check
-                    if (nextUrl.pathname.startsWith("/student") && role !== "STUDENT") return false;
-                    if (nextUrl.pathname.startsWith("/instructor") && role !== "INSTRUCTOR") return false;
-                    if (nextUrl.pathname.startsWith("/admin") && role !== "ADMIN") return false;
-                    if (nextUrl.pathname.startsWith("/parent") && role !== "PARENT") return false;
+                    // Let Server Components handle strict DB role checks if cookie role is missing
+                    if (nextUrl.pathname.startsWith("/student") && role && role !== "STUDENT" && role !== "ADMIN") return false;
+                    if (nextUrl.pathname.startsWith("/instructor") && role && role !== "INSTRUCTOR" && role !== "ADMIN") return false;
+                    if (nextUrl.pathname.startsWith("/admin") && role && role !== "ADMIN") return false;
+                    if (nextUrl.pathname.startsWith("/parent") && role && role !== "PARENT" && role !== "ADMIN") return false;
                     return true;
                 }
                 return false; // Redirect unauthenticated users to login page

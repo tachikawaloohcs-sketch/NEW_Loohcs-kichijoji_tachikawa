@@ -10,7 +10,7 @@ export default async function StudentDashboardPage() {
     const session = await auth();
     console.log("DEBUG PAGE: Session:", session?.user?.email, session?.user?.role, session?.user?.id, session?.user?.hasChangedParentPassword);
 
-    if (!session?.user || (session.user.role !== "STUDENT" && session.user.role !== "ADMIN")) {
+    if (!session?.user?.id) {
         redirect("/login");
     }
     const dbUser = await prisma.user.findUnique({
