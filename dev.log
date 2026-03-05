@@ -144,3 +144,8 @@ Timed out fetching a new connection from the connection pool. More info: http://
  GET / 200 in 194ms (compile: 2ms, render: 192ms)
  GET / 200 in 175ms (compile: 3ms, render: 172ms)
  GET / 200 in 35ms (compile: 17ms, render: 19ms)
+✓ Compiled in 78ms
+ GET / 200 in 426ms (compile: 311ms, render: 115ms)
+ GET / 200 in 60ms (compile: 5ms, render: 56ms)
+ GET / 200 in 41ms (compile: 1579µs, render: 40ms)
+ GET / 200 in 17ms (compile: 1857µs, render: 15ms)

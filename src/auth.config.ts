@@ -99,14 +99,9 @@ export const authConfig: NextAuthConfig = {
             // Dashboard logic
             if (isOnDashboard) {
                 if (isLoggedIn) {
-                    // Admins bypass role restrictions
-                    if (role === "ADMIN") return true;
-
-                    // Let Server Components handle strict DB role checks if cookie role is missing
-                    if (nextUrl.pathname.startsWith("/student") && role && role !== "STUDENT" && role !== "ADMIN") return false;
-                    if (nextUrl.pathname.startsWith("/instructor") && role && role !== "INSTRUCTOR" && role !== "ADMIN") return false;
-                    if (nextUrl.pathname.startsWith("/admin") && role && role !== "ADMIN") return false;
-                    if (nextUrl.pathname.startsWith("/parent") && role && role !== "PARENT" && role !== "ADMIN") return false;
+                    // Middleware role checks are removed.
+                    // Instead, server components (page.tsx/layout.tsx) do direct DB lookups
+                    // to verify role correctly and prevent stale session looping.
                     return true;
                 }
                 return false; // Redirect unauthenticated users to login page
