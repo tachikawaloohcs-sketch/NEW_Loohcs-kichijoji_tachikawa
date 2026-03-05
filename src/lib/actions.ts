@@ -25,6 +25,10 @@ export async function authenticate(prevState: string | undefined, formData: Form
             redirectUrl = "/admin/dashboard";
         } else if (user?.role === "PARENT") {
             redirectUrl = "/parent/dashboard";
+        } else if (user?.role === "INSTRUCTOR") {
+            redirectUrl = "/instructor/dashboard";
+        } else if (user?.role === "STUDENT") {
+            redirectUrl = "/student/dashboard";
         }
 
         await signIn("credentials", formData, { redirectTo: redirectUrl });
