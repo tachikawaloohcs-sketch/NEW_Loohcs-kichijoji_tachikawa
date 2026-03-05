@@ -4,24 +4,68 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle, BrainCircuit, RefreshCw, Trophy, ArrowRight } from "lucide-react";
 
-// Mock Vocabulary Data
-const VOCAB_DATABASE = [
-    { id: 1, word: "abandon", meaning: "捨てる、見捨てる", wrongOptions: ["保持する", "発展させる", "理解する"] },
-    { id: 2, word: "absorb", meaning: "吸収する", wrongOptions: ["放出する", "分離する", "無視する"] },
-    { id: 3, word: "abundant", meaning: "豊富な", wrongOptions: ["希少な", "危険な", "退屈な"] },
-    { id: 4, word: "accelerate", meaning: "加速させる", wrongOptions: ["停止する", "減少する", "隠す"] },
-    { id: 5, word: "accommodate", meaning: "収容する、適応させる", wrongOptions: ["拒否する", "攻撃する", "逃げる"] },
-    { id: 6, word: "accumulate", meaning: "蓄積する", wrongOptions: ["消費する", "分散する", "忘れる"] },
-    { id: 7, word: "adequate", meaning: "適切な、十分な", wrongOptions: ["不足している", "複雑な", "古い"] },
-    { id: 8, word: "advocate", meaning: "提唱する、主張する", wrongOptions: ["反対する", "破壊する", "隠蔽する"] },
-    { id: 9, word: "ambiguous", meaning: "曖昧な", wrongOptions: ["明確な", "巨大な", "親切な"] },
-    { id: 10, word: "anticipate", meaning: "予期する", wrongOptions: ["後悔する", "無視する", "証明する"] },
-    { id: 11, word: "apparent", meaning: "明白な", wrongOptions: ["隠された", "複雑な", "高価な"] },
-    { id: 12, word: "assign", meaning: "割り当てる", wrongOptions: ["奪う", "拒絶する", "賞賛する"] },
-    // Add more if needed, 12 is enough to demonstrate a 10-question set
-];
+// Mock Vocabulary Data per Grade
+const VOCAB_DATABASE: Record<string, { id: number; word: string; meaning: string; wrongOptions: string[] }[]> = {
+    "5級": [
+        { id: 101, word: "dog", meaning: "犬", wrongOptions: ["猫", "鳥", "魚"] },
+        { id: 102, word: "cat", meaning: "猫", wrongOptions: ["犬", "馬", "豚"] },
+        { id: 103, word: "apple", meaning: "りんご", wrongOptions: ["みかん", "ぶどう", "バナナ"] },
+        { id: 104, word: "book", meaning: "本", wrongOptions: ["机", "ペン", "椅子"] },
+        { id: 105, word: "water", meaning: "水", wrongOptions: ["火", "土", "風"] },
+        { id: 106, word: "school", meaning: "学校", wrongOptions: ["病院", "公園", "駅"] },
+        { id: 107, word: "friend", meaning: "友達", wrongOptions: ["敵", "先生", "家族"] },
+    ],
+    "4級": [
+        { id: 201, word: "beautiful", meaning: "美しい", wrongOptions: ["醜い", "速い", "遅い"] },
+        { id: 202, word: "tomorrow", meaning: "明日", wrongOptions: ["昨日", "今日", "明後日"] },
+        { id: 203, word: "understand", meaning: "理解する", wrongOptions: ["忘れる", "走る", "食べる"] },
+        { id: 204, word: "different", meaning: "違う、異なる", wrongOptions: ["同じ", "安全な", "危険な"] },
+        { id: 205, word: "history", meaning: "歴史", wrongOptions: ["数学", "理科", "体育"] },
+        { id: 206, word: "important", meaning: "重要な", wrongOptions: ["無駄な", "軽い", "短い"] },
+        { id: 207, word: "language", meaning: "言語", wrongOptions: ["音楽", "絵画", "スポーツ"] },
+    ],
+    "3級": [
+        { id: 301, word: "experience", meaning: "経験", wrongOptions: ["知識", "感情", "理由"] },
+        { id: 302, word: "environment", meaning: "環境", wrongOptions: ["経済", "政治", "教育"] },
+        { id: 303, word: "necessary", meaning: "必要な", wrongOptions: ["不必要な", "簡単な", "難しい"] },
+        { id: 304, word: "improve", meaning: "改善する", wrongOptions: ["悪化させる", "維持する", "無視する"] },
+        { id: 305, word: "society", meaning: "社会", wrongOptions: ["個人", "自然", "宇宙"] },
+        { id: 306, word: "knowledge", meaning: "知識", wrongOptions: ["経験", "体力", "財産"] },
+    ],
+    "準2級": [
+        { id: 401, word: "abandon", meaning: "捨てる、見捨てる", wrongOptions: ["保持する", "発展させる", "理解する"] },
+        { id: 402, word: "absorb", meaning: "吸収する", wrongOptions: ["放出する", "分離する", "無視する"] },
+        { id: 403, word: "abundant", meaning: "豊富な", wrongOptions: ["希少な", "危険な", "退屈な"] },
+        { id: 404, word: "accelerate", meaning: "加速させる", wrongOptions: ["停止する", "減少する", "隠す"] },
+        { id: 405, word: "accommodate", meaning: "収容する", wrongOptions: ["拒否する", "攻撃する", "逃げる"] },
+        { id: 406, word: "accumulate", meaning: "蓄積する", wrongOptions: ["消費する", "分散する", "忘れる"] },
+        { id: 407, word: "adequate", meaning: "適切な、十分な", wrongOptions: ["不足している", "複雑な", "古い"] },
+    ],
+    "2級": [
+        { id: 501, word: "ambiguous", meaning: "曖昧な", wrongOptions: ["明確な", "巨大な", "親切な"] },
+        { id: 502, word: "anticipate", meaning: "予期する", wrongOptions: ["後悔する", "無視する", "証明する"] },
+        { id: 503, word: "apparent", meaning: "明白な", wrongOptions: ["隠された", "複雑な", "高価な"] },
+        { id: 504, word: "assign", meaning: "割り当てる", wrongOptions: ["奪う", "拒絶する", "賞賛する"] },
+        { id: 505, word: "artificial", meaning: "人工の", wrongOptions: ["自然の", "美しい", "壊れた"] },
+    ],
+    "準1級": [
+        { id: 601, word: "advocate", meaning: "提唱する", wrongOptions: ["反対する", "破壊する", "隠蔽する"] },
+        { id: 602, word: "consensus", meaning: "合意", wrongOptions: ["対立", "命令", "混乱"] },
+        { id: 603, word: "provoke", meaning: "引き起こす、挑発する", wrongOptions: ["鎮める", "逃げる", "喜ばせる"] },
+        { id: 604, word: "vulnerable", meaning: "傷つきやすい", wrongOptions: ["頑丈な", "賢い", "素早い"] },
+        { id: 605, word: "lucrative", meaning: "儲かる", wrongOptions: ["損する", "退屈な", "危険な"] },
+    ],
+    "1級": [
+        { id: 701, word: "anomalous", meaning: "変則的な、異例の", wrongOptions: ["普通の", "巨大な", "親切な"] },
+        { id: 702, word: "belligerent", meaning: "好戦的な", wrongOptions: ["平和的な", "悲しい", "楽しい"] },
+        { id: 703, word: "capricious", meaning: "気まぐれな", wrongOptions: ["一貫した", "重い", "軽い"] },
+        { id: 704, word: "ebullient", meaning: "熱狂的な、活気あふれる", wrongOptions: ["無気力な", "慎重な", "静かな"] },
+        { id: 705, word: "fastidious", meaning: "気難しい", wrongOptions: ["大雑把な", "柔軟な", "元気な"] },
+    ]
+};
 
 // Utility to shuffle an array
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -49,12 +93,15 @@ export default function VocabularyQuiz() {
     const [score, setScore] = useState(0);
     const [completed, setCompleted] = useState(false);
 
+    const [selectedGrade, setSelectedGrade] = useState("準2級");
+
     // Proficiency state (mocked from instructor setting)
     const proficiencyPercentage = 68;
 
     const startQuiz = () => {
-        // Select 10 words randomly
-        const selectedWords = shuffleArray(VOCAB_DATABASE).slice(0, 10);
+        const wordsForGrade = VOCAB_DATABASE[selectedGrade] || [];
+        // Select up to 10 words randomly
+        const selectedWords = shuffleArray(wordsForGrade).slice(0, 10);
 
         const initialQueue = selectedWords.map(v => {
             const options = shuffleArray([v.meaning, ...v.wrongOptions]);
@@ -87,7 +134,8 @@ export default function VocabularyQuiz() {
             setScore(s => s + 1);
         } else {
             // Re-queue the wrong question at the end with shuffled options
-            const originalVocab = VOCAB_DATABASE.find(v => v.id === currentQ.wordId);
+            const wordsForGrade = VOCAB_DATABASE[selectedGrade] || [];
+            const originalVocab = wordsForGrade.find(v => v.id === currentQ.wordId);
             if (originalVocab) {
                 const newOptions = shuffleArray([originalVocab.meaning, ...originalVocab.wrongOptions]);
                 setQueue(prev => [...prev, {
@@ -124,10 +172,30 @@ export default function VocabularyQuiz() {
                     <CardContent className="space-y-8">
                         {/* Instructor set proficiency */}
                         <div className="bg-black/20 p-6 rounded-xl border border-blue-500/20">
-                            <div className="flex justify-between items-end mb-2">
+
+                            {/* Grade Selection */}
+                            <div className="mb-8">
+                                <Label className="text-blue-200 font-bold mb-3 block">挑戦する級を選択してください</Label>
+                                <div className="flex flex-wrap gap-2">
+                                    {Object.keys(VOCAB_DATABASE).map(grade => (
+                                        <button
+                                            key={grade}
+                                            onClick={() => setSelectedGrade(grade)}
+                                            className={`py-2 px-4 rounded-lg font-bold transition-all text-sm ${selectedGrade === grade
+                                                ? "bg-blue-600 text-white shadow-lg border border-blue-400"
+                                                : "bg-blue-950/60 text-blue-300 border border-blue-900/50 hover:bg-blue-900 hover:text-white"
+                                                }`}
+                                        >
+                                            {grade}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between items-end mb-2 pt-4 border-t border-blue-900/50">
                                 <div>
-                                    <p className="text-sm font-medium text-blue-300 mb-1">現在の習熟度設定（担当講師評価）</p>
-                                    <h3 className="text-3xl font-black text-white">{proficiencyPercentage}% <span className="text-sm font-normal text-slate-400">/ 準2級レベル</span></h3>
+                                    <p className="text-sm font-medium text-blue-400 mb-1">現在の総合習熟度</p>
+                                    <h3 className="text-3xl font-black text-white">{proficiencyPercentage}% <span className="text-sm font-normal text-slate-400">/ 目標達成率</span></h3>
                                 </div>
                                 <Trophy className="w-8 h-8 text-yellow-500 opacity-80" />
                             </div>
