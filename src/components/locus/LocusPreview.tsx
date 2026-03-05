@@ -15,6 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import Link from "next/link";
 import { generateRefutation } from "@/app/locus/actions";
+import VocabularyQuiz from "@/components/eiken/VocabularyQuiz";
+import EssayContent from "@/components/essay/EssayContent";
+import { useRouter } from "next/navigation";
 
 // ========== Mock Data ==========
 const MOCK_HISTORY = [
@@ -60,10 +63,11 @@ const MOCK_HISTORY = [
     }
 ];
 
-export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: string }) {
+export default function LocusPreview({ userRole = "STUDENT", initialTab = "TIMELINE" }: { userRole?: string, initialTab?: "TIMELINE" | "SUBMIT" | "PAGES" | "EIKEN" | "ESSAY" }) {
     const isInstructor = userRole === "INSTRUCTOR" || userRole === "ADMIN";
     const viewMode = isInstructor ? "INSTRUCTOR" : "STUDENT";
-    const [activeTab, setActiveTab] = useState<"TIMELINE" | "SUBMIT" | "PAGES">("TIMELINE");
+    const [activeTab, setActiveTab] = useState<"TIMELINE" | "SUBMIT" | "PAGES" | "EIKEN" | "ESSAY">(initialTab);
+    const router = useRouter();
 
     const [isGeneratingRefutation, setIsGeneratingRefutation] = useState(false);
     const [aiRefutations, setAiRefutations] = useState<{ title: string; content: string }[] | null>(null);
@@ -117,41 +121,45 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
 
                 <div className="p-4 mt-auto border-t border-zinc-800">
                     <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Study Materials</div>
-                    <Link href="/student/eiken" className="w-full text-left px-3 py-2 hover:bg-zinc-900/50 rounded text-zinc-400 hover:text-blue-400 transition-colors flex items-center gap-2">
+                    <button onClick={() => setActiveTab("EIKEN")} className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${activeTab === "EIKEN" ? "bg-zinc-900 text-blue-400" : "hover:bg-zinc-900/50 text-zinc-400 hover:text-blue-400"}`}>
                         <BrainCircuit className="w-4 h-4" /> 英検 特訓ルーム
-                    </Link>
-                    <Link href="/student/essay" className="w-full text-left px-3 py-2 mt-1 hover:bg-zinc-900/50 rounded text-zinc-400 hover:text-rose-400 transition-colors flex items-center gap-2">
+                    </button>
+                    <button onClick={() => setActiveTab("ESSAY")} className={`w-full text-left px-3 py-2 mt-1 rounded transition-colors flex items-center gap-2 ${activeTab === "ESSAY" ? "bg-zinc-900 text-rose-400" : "hover:bg-zinc-900/50 text-zinc-400 hover:text-rose-400"}`}>
                         <PenTool className="w-4 h-4" /> 小論文 Locus
+                    </button>
+                    <Link href="/student/dashboard" className="w-full text-left px-3 py-2 mt-4 hover:bg-zinc-900/50 border border-zinc-800 rounded text-zinc-500 hover:text-white transition-colors flex items-center gap-2">
+                        <ArrowRight className="w-4 h-4 rotate-180" /> Dashboard
                     </Link>
                 </div>
             </aside>
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col h-full overflow-hidden">
-                {/* Header Navbar */}
-                <header className="h-14 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur flex items-center justify-between px-6 z-10">
-                    <div className="flex gap-6">
-                        <button
-                            onClick={() => setActiveTab("TIMELINE")}
-                            className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "TIMELINE" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
-                        >
-                            <MapIcon className="w-4 h-4" /> 構造マップ (Timeline)
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("SUBMIT")}
-                            className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "SUBMIT" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
-                        >
-                            <GitCommit className="w-4 h-4" /> 授業提出 (Update)
-                        </button>
-                        <button
-                            onClick={() => setActiveTab("PAGES")}
-                            className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "PAGES" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
-                        >
-                            <FileText className="w-4 h-4" /> 5枚生成 (Extraction)
-                        </button>
-                    </div>
-
-                </header>
+                {/* Header Navbar - Only visible for Research themes */}
+                {(activeTab === "TIMELINE" || activeTab === "SUBMIT" || activeTab === "PAGES") && (
+                    <header className="h-14 border-b border-zinc-800 bg-zinc-950/80 backdrop-blur flex items-center justify-between px-6 z-10 shrink-0">
+                        <div className="flex gap-6">
+                            <button
+                                onClick={() => setActiveTab("TIMELINE")}
+                                className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "TIMELINE" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
+                            >
+                                <MapIcon className="w-4 h-4" /> 構造マップ (Timeline)
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("SUBMIT")}
+                                className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "SUBMIT" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
+                            >
+                                <GitCommit className="w-4 h-4" /> 授業提出 (Update)
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("PAGES")}
+                                className={`flex items-center gap-2 pb-1 border-b-2 transition-colors ${activeTab === "PAGES" ? "border-emerald-500 text-emerald-400" : "border-transparent text-zinc-400 hover:text-zinc-200"}`}
+                            >
+                                <FileText className="w-4 h-4" /> 5枚生成 (Extraction)
+                            </button>
+                        </div>
+                    </header>
+                )}
 
                 {/* Content Grid */}
                 <div className="flex-1 flex overflow-hidden">
@@ -171,145 +179,150 @@ export default function LocusPreview({ userRole = "STUDENT" }: { userRole?: stri
                             />
                         )}
                         {activeTab === "PAGES" && <FivePagesGenerator history={history} />}
+                        {activeTab === "EIKEN" && <VocabularyQuiz />}
+                        {activeTab === "ESSAY" && <EssayContent />}
                     </div>
 
-                    {/* Right Column: Always Display Weakness Analyzer */}
-                    <aside className="w-[320px] lg:w-[400px] border-l border-zinc-800 bg-zinc-950 p-6 overflow-y-auto">
-                        <div className="sticky top-0">
-                            <h3 className="font-bold text-zinc-100 flex items-center gap-2 mb-6">
-                                <Target className="w-4 h-4 text-emerald-500" />
-                                Weakness Analyzer
-                            </h3>
-
-                            {viewMode === "STUDENT" ? (
-                                <div className="space-y-6">
-                                    {/* 1. 構造的欠陥 / Flaws */}
-                                    <div>
-                                        <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <AlertTriangle className="w-4 h-4" /> 構造的欠陥 (Flaws)
-                                        </h4>
-                                        <div className="space-y-3">
-                                            <div className="bg-zinc-900/50 border border-zinc-800 rounded p-4">
-                                                <div className="flex items-start gap-3">
-                                                    <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                                    <div>
-                                                        <h4 className="text-zinc-200 font-medium mb-1">仮説が「未検証の前提」に依存しています</h4>
-                                                        <p className="text-zinc-400 text-xs leading-relaxed">
-                                                            「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測です。『権限を渡しても動けなかったケース』への対策が準備されていません。このままでは論理が破綻します。
-                                                        </p>
+                    {/* Right Column: Always Display Weakness Analyzer for Research tabs */}
+                    {(activeTab === "TIMELINE" || activeTab === "SUBMIT" || activeTab === "PAGES") && (
+                        <aside className="w-80 border-l border-zinc-800 bg-zinc-950/80 flex flex-col hidden xl:flex shrink-0 sticky top-0">
+                            <div className="p-4 border-b border-zinc-800 h-14 flex items-center">
+                                <div className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
+                                    <Target className="w-4 h-4 text-emerald-500" />
+                                    Weakness Analyzer
+                                </div>
+                            </div>
+                            <div className="p-6 overflow-y-auto">
+                                {viewMode === "STUDENT" ? (
+                                    <div className="space-y-6">
+                                        {/* 1. 構造的欠陥 / Flaws */}
+                                        <div>
+                                            <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <AlertTriangle className="w-4 h-4" /> 構造的欠陥 (Flaws)
+                                            </h4>
+                                            <div className="space-y-3">
+                                                <div className="bg-zinc-900/50 border border-zinc-800 rounded p-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                        <div>
+                                                            <h4 className="text-zinc-200 font-medium mb-1">仮説が「未検証の前提」に依存しています</h4>
+                                                            <p className="text-zinc-400 text-xs leading-relaxed">
+                                                                「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測です。『権限を渡しても動けなかったケース』への対策が準備されていません。このままでは論理が破綻します。
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* 2. 何ができていないか / Missing Task */}
-                                    <div>
-                                        <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <ListX className="w-4 h-4" /> 未完了 / 次のステップ (Missing)
-                                        </h4>
-                                        <div className="bg-zinc-900/50 border border-zinc-800 rounded p-4">
-                                            <ul className="space-y-3 text-xs text-zinc-400">
-                                                <li className="flex items-start gap-2">
-                                                    <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200 block">会長側のみのヒアリング</strong>若手側の証言やデータが存在しないため、片側だけの意見になっています。</span>
-                                                </li>
-                                                <li className="flex items-start gap-2">
-                                                    <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                                                    <span><strong className="text-zinc-200 block">概念が曖昧</strong>「権限移譲」の具体的な定義（予算なのか、人事権なのか）がされていません。</span>
-                                                </li>
-                                                <li className="flex items-start gap-2 pt-2 border-t border-zinc-800/50 text-blue-400">
-                                                    <Search className="w-4 h-4 shrink-0 mt-0.5" />
-                                                    <span>→ 類似事例（成功/失敗）の先行研究を探し、仮説の解像度を上げてください。</span>
-                                                </li>
-                                            </ul>
+                                        {/* 2. 何ができていないか / Missing Task */}
+                                        <div>
+                                            <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <ListX className="w-4 h-4" /> 未完了 / 次のステップ (Missing)
+                                            </h4>
+                                            <div className="bg-zinc-900/50 border border-zinc-800 rounded p-4">
+                                                <ul className="space-y-3 text-xs text-zinc-400">
+                                                    <li className="flex items-start gap-2">
+                                                        <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                                                        <span><strong className="text-zinc-200 block">会長側のみのヒアリング</strong>若手側の証言やデータが存在しないため、片側だけの意見になっています。</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-2">
+                                                        <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                                                        <span><strong className="text-zinc-200 block">概念が曖昧</strong>「権限移譲」の具体的な定義（予算なのか、人事権なのか）がされていません。</span>
+                                                    </li>
+                                                    <li className="flex items-start gap-2 pt-2 border-t border-zinc-800/50 text-blue-400">
+                                                        <Search className="w-4 h-4 shrink-0 mt-0.5" />
+                                                        <span>→ 類似事例（成功/失敗）の先行研究を探し、仮説の解像度を上げてください。</span>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* AIによる反論 (AI Refutation) */}
-                                    <div>
-                                        <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
-                                            <Sparkles className="w-4 h-4" /> AIからの反論 (AI Refutation)
-                                        </h4>
-                                        <div className="bg-zinc-900/50 border border-emerald-900/50 rounded p-4">
-                                            {aiRefutations ? (
-                                                <>
-                                                    <p className="text-emerald-400 text-xs font-bold mb-3">学術論拠に基づく反証観点：</p>
-                                                    <ul className="space-y-4 text-zinc-300 text-xs leading-relaxed">
-                                                        {aiRefutations.map((ref, idx) => (
-                                                            <li key={idx} className="flex items-start gap-3 border-b border-zinc-800/50 pb-3 last:border-0 last:pb-0">
-                                                                <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                                                                <div>
-                                                                    <strong className="text-zinc-100 block mb-1.5">{ref.title}</strong>
-                                                                    <span className="text-zinc-400 leading-loose">{ref.content}</span>
-                                                                </div>
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </>
-                                            ) : (
-                                                <div className="text-center py-4 space-y-3">
-                                                    <p className="text-xs text-zinc-400">現在の仮説に対して、学術的な先行研究に基づく厳しい反証を行います。</p>
+                                        {/* AIによる反論 (AI Refutation) */}
+                                        <div>
+                                            <h4 className="text-zinc-500 text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <Sparkles className="w-4 h-4" /> AIからの反論 (AI Refutation)
+                                            </h4>
+                                            <div className="bg-zinc-900/50 border border-emerald-900/50 rounded p-4">
+                                                {aiRefutations ? (
+                                                    <>
+                                                        <p className="text-emerald-400 text-xs font-bold mb-3">学術論拠に基づく反証観点：</p>
+                                                        <ul className="space-y-4 text-zinc-300 text-xs leading-relaxed">
+                                                            {aiRefutations.map((ref, idx) => (
+                                                                <li key={idx} className="flex items-start gap-3 border-b border-zinc-800/50 pb-3 last:border-0 last:pb-0">
+                                                                    <ArrowRightCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                                                    <div>
+                                                                        <strong className="text-zinc-100 block mb-1.5">{ref.title}</strong>
+                                                                        <span className="text-zinc-400 leading-loose">{ref.content}</span>
+                                                                    </div>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </>
+                                                ) : (
+                                                    <div className="text-center py-4 space-y-3">
+                                                        <p className="text-xs text-zinc-400">現在の仮説に対して、学術的な先行研究に基づく厳しい反証を行います。</p>
 
-                                                    {aiError && (
-                                                        <p className="text-xs text-rose-400 bg-rose-950/30 p-2 rounded">{aiError}</p>
-                                                    )}
-
-                                                    <Button
-                                                        onClick={() => handleGenerateRefutation()}
-                                                        disabled={isGeneratingRefutation}
-                                                        className="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-100 transition-colors h-10 border border-emerald-800/50 shadow-inner"
-                                                    >
-                                                        {isGeneratingRefutation ? (
-                                                            <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> 反論生成中...</>
-                                                        ) : (
-                                                            <><BrainCircuit className="w-4 h-4 mr-2" /> 学術論文から反証を出力する</>
+                                                        {aiError && (
+                                                            <p className="text-xs text-rose-400 bg-rose-950/30 p-2 rounded">{aiError}</p>
                                                         )}
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
 
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="bg-red-950/20 border border-red-900/50 rounded p-4">
-                                        <div className="flex items-start gap-3">
-                                            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-                                            <div>
-                                                <h4 className="text-zinc-200 font-medium mb-1">【危険度高】仮説が未検証前提に依存</h4>
-                                                <p className="text-red-400/80 text-xs mt-1">
-                                                    「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測。<br />
-                                                    反証となる「若手に任せても動かなかった事例」が無い。
-                                                </p>
+                                                        <Button
+                                                            onClick={() => handleGenerateRefutation()}
+                                                            disabled={isGeneratingRefutation}
+                                                            className="w-full bg-emerald-900/40 hover:bg-emerald-800 text-emerald-100 transition-colors h-10 border border-emerald-800/50 shadow-inner"
+                                                        >
+                                                            {isGeneratingRefutation ? (
+                                                                <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> 反論生成中...</>
+                                                            ) : (
+                                                                <><BrainCircuit className="w-4 h-4 mr-2" /> 学術論文から反証を出力する</>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
+
                                     </div>
-                                    <div className="bg-amber-950/20 border border-amber-900/50 rounded p-4">
-                                        <div className="flex items-start gap-3">
-                                            <GitCommit className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                            <div>
-                                                <h4 className="text-zinc-200 font-medium mb-1">構造停滞: 危機的</h4>
-                                                <p className="text-amber-400/80 text-xs mt-1">
-                                                    「問い」自体が2週間更新されていない。接触は再定義を生んだが、トップの問いに反映されていない。
-                                                </p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="bg-red-950/20 border border-red-900/50 rounded p-4">
+                                            <div className="flex items-start gap-3">
+                                                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <h4 className="text-zinc-200 font-medium mb-1">【危険度高】仮説が未検証前提に依存</h4>
+                                                    <p className="text-red-400/80 text-xs mt-1">
+                                                        「若手に完全に権限を委譲すれば、活性化のアイデアは実行される」は希望的観測。<br />
+                                                        反証となる「若手に任せても動かなかった事例」が無い。
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
+                                        <div className="bg-amber-950/20 border border-amber-900/50 rounded p-4">
+                                            <div className="flex items-start gap-3">
+                                                <GitCommit className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <h4 className="text-zinc-200 font-medium mb-1">構造停滞: 危機的</h4>
+                                                    <p className="text-amber-400/80 text-xs mt-1">
+                                                        「問い」自体が2週間更新されていない。接触は再定義を生んだが、トップの問いに反映されていない。
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="bg-emerald-950/20 border border-emerald-900/50 rounded p-4 mt-8">
+                                            <h4 className="text-emerald-400 font-medium mb-2 text-xs uppercase tracking-widest">Instructor Tools</h4>
+                                            <button className="w-full text-left text-xs p-2 bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 transition">
+                                                + コメント付きで再定義を要求する
+                                            </button>
+                                            <button className="w-full text-left text-xs p-2 mt-2 bg-zinc-900 text-zinc-400 rounded hover:bg-zinc-800 transition">
+                                                + 外部接触のやり直しを指示
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="bg-emerald-950/20 border border-emerald-900/50 rounded p-4 mt-8">
-                                        <h4 className="text-emerald-400 font-medium mb-2 text-xs uppercase tracking-widest">Instructor Tools</h4>
-                                        <button className="w-full text-left text-xs p-2 bg-emerald-900/30 text-emerald-300 rounded hover:bg-emerald-900/50 transition">
-                                            + コメント付きで再定義を要求する
-                                        </button>
-                                        <button className="w-full text-left text-xs p-2 mt-2 bg-zinc-900 text-zinc-400 rounded hover:bg-zinc-800 transition">
-                                            + 外部接触のやり直しを指示
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </aside>
+                                )}
+                            </div>
+                        </aside>
+                    )}
                 </div>
             </main>
         </div>
