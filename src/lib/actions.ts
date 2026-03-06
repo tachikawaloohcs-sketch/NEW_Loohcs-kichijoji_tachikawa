@@ -31,7 +31,10 @@ export async function authenticate(prevState: string | undefined, formData: Form
             redirectUrl = "/student/dashboard";
         }
 
-        await signIn("credentials", formData, { redirectTo: redirectUrl });
+        await signIn("credentials", {
+            ...Object.fromEntries(formData),
+            redirectTo: redirectUrl,
+        });
     } catch (error) {
         if (error instanceof AuthError) {
             switch (error.type) {
