@@ -106,9 +106,14 @@ export const authConfig: NextAuthConfig = {
                 }
                 return false; // Redirect unauthenticated users to login page
             } else if (isLoggedIn) {
-                // Redirect logged-in users away from auth pages
+                // Redirect logged-in users away from auth pages to their respective dashboards
                 const isOnAuthPage = nextUrl.pathname === "/login" || nextUrl.pathname === "/register";
                 if (isOnAuthPage) {
+                    if (role === "ADMIN") return Response.redirect(new URL("/admin/dashboard", nextUrl));
+                    if (role === "INSTRUCTOR") return Response.redirect(new URL("/instructor/dashboard", nextUrl));
+                    if (role === "PARENT") return Response.redirect(new URL("/parent/dashboard", nextUrl));
+                    if (role === "STUDENT") return Response.redirect(new URL("/student/dashboard", nextUrl));
+
                     return Response.redirect(new URL("/", nextUrl));
                 }
             }
